@@ -248,8 +248,8 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
                 CHR = i[0], 
                 POS = str(int(i[2])), 
                 ID = "cuteSV.%s.%d"%(i[1], svid[i[1]]),
-                REF = str(ref_g[i[0]].seq[max(int(i[2])-1, 0)]) if i[1] == 'INS' else str(ref_g[i[0]].seq[max(int(i[2])-1, 0):int(i[2])-int(i[3])]),
-                ALT = "%s"%(str(ref_g[i[0]].seq[max(int(i[2])-1, 0)])+i[13] if i[1] == 'INS' else str(ref_g[i[0]].seq[max(int(i[2])-1, 0)])), 
+                REF = str(ref_g[i[0]][max(int(i[2])-1, 0)]) if i[1] == 'INS' else str(ref_g[i[0]][max(int(i[2])-1, 0):int(i[2])-int(i[3])]),
+                ALT = "%s"%(str(ref_g[i[0]][max(int(i[2])-1, 0)])+i[13] if i[1] == 'INS' else str(ref_g[i[0]][max(int(i[2])-1, 0)])), 
                 INFO = info_list, 
                 FORMAT = "GT:DR:DV:PL:GQ", 
                 GT = i[8],
@@ -284,7 +284,7 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
                 CHR = i[0], 
                 POS = str(int(i[2]) + 1), 
                 ID = "cuteSV.%s.%d"%(i[1], svid[i[1]]),
-                REF = str(ref_g[i[0]].seq[int(i[2])]),
+                REF = str(ref_g[i[0]][int(i[2])]),
                 ALT = "<%s>"%(i[1]), 
                 INFO = info_list, 
                 FORMAT = "GT:DR:DV:PL:GQ", 
@@ -321,7 +321,7 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
                 CHR = i[0], 
                 POS = str(int(i[2]) + 1), 
                 ID = "cuteSV.%s.%d"%(i[1], svid[i[1]]),
-                REF = str(ref_g[i[0]].seq[int(i[2])]),
+                REF = str(ref_g[i[0]][int(i[2])]),
                 ALT = "<%s>"%(i[1]), 
                 INFO = info_list, 
                 FORMAT = "GT:DR:DV:PL:GQ", 
@@ -352,11 +352,15 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
                 filter_lable = "PASS"
             else:
                 filter_lable = "PASS" if float(i[10]) >= 5.0 else "q5"
+            try:
+                reff = str(ref_g[i[0]][int(i[2])])
+            except:
+                reff = 'N'
             file.write("{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
                 CHR = i[0], 
                 POS = str(int(i[2]) + 1), 
                 ID = "cuteSV.%s.%d"%("BND", svid["BND"]), 
-                REF = 'N',
+                REF = reff,
                 ALT = i[1], 
                 INFO = info_list, 
                 FORMAT = "GT:DR:DV:PL:GQ", 
@@ -389,13 +393,13 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
                 continue
             '''
             if i[11] == '<INS>':
-                ref = str(ref_g[i[0]].seq[max(i[1]-1, 0)])
-                alt = str(ref_g[i[0]].seq[max(i[1]-1, 0)]) + i[13]
+                ref = str(ref_g[i[0]][max(i[1]-1, 0)])
+                alt = str(ref_g[i[0]][max(i[1]-1, 0)]) + i[13]
             else:
                 ref = i[10]
                 alt = i[11]
             '''
-            ref = str(ref_g[i[0]].seq[max(i[1]-1, 0)])
+            ref = str(ref_g[i[0]][max(i[1]-1, 0)])
             alt = i[11]
             info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};CIPOS={CIPOS};CILEN={CILEN};RE={RE};RNAMES={RNAMES}".format(
                 PRECISION = "IMPRECISE" if i[2] == "0/0" else "PRECISE", 
@@ -430,8 +434,8 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             if abs(i[4]) > args.max_size and args.max_size != -1:
                 continue
             if i[12] == '<DEL>':
-                ref = str(ref_g[i[0]].seq[max(int(i[1])-1, 0):int(i[1])-int(i[4])])
-                alt = str(ref_g[i[0]].seq[max(int(i[1])-1, 0)])
+                ref = str(ref_g[i[0]][max(int(i[1])-1, 0):int(i[1])-int(i[4])])
+                alt = str(ref_g[i[0]][max(int(i[1])-1, 0)])
             else:
                 ref = i[10]
                 alt = i[11]
