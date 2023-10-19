@@ -2,3 +2,5 @@
 /src/*.egg-info/
 /src/*.pyc
 /build/
+/dev/
+__pycache__/
