@@ -8,6 +8,7 @@
  * @version V2.0.3
 """
 
+from pathlib import Path
 import pysam
 import cigar
 import pyfastx
@@ -48,6 +49,31 @@ signal = {1 << 2: 0, 1 >> 1: 1, 1 << 4: 2, 1 << 11: 3, 1 << 4 | 1 << 11: 4}
 def detect_flag(Flag):
     back_sig = signal[Flag] if Flag in signal else 0
     return back_sig
+
+
+def get_query_name(read: pysam.AlignedSegment) -> str:
+    """Get aligned read name annotated with source of th read
+
+    Args:
+        read (pysam.AlignedSegment): Alignment info from pysam/bam/cram
+
+    Returns:
+        str: Read name in format 'query_name:read_group:haplotype:phase_set
+    """
+    try:
+        rg = read.get_tag("RG")
+    except KeyError:
+        rg = ""
+    # try:
+    #     hp = str(read.get_tag("HP"))
+    # except KeyError:
+    #     hp = ""
+    # try:
+    #     ps = str(read.get_tag("PS"))
+    # except KeyError:
+    #     ps = ""
+    read_name = ":".join([read.query_name, rg])
+    return read_name
 
 
 def analysis_inv(ele_1, ele_2, read_name, candidate, SV_size):
@@ -786,7 +812,7 @@ def parse_read(
     generate_combine_sigs(
         Combine_sig_in_same_read_ins,
         Chr_name,
-        read.query_name,
+        get_query_name(read),
         "INS",
         candidate,
         merge_ins_threshold,
@@ -794,7 +820,7 @@ def parse_read(
     generate_combine_sigs(
         Combine_sig_in_same_read_del,
         Chr_name,
-        read.query_name,
+        get_query_name(read),
         "DEL",
         candidate,
         merge_del_threshold,
@@ -834,7 +860,7 @@ def parse_read(
                     SV_size,
                     min_mapq,
                     max_split_parts,
-                    read.query_name,
+                    get_query_name(read),
                     candidate,
                     MaxSize,
                     read.query_sequence,
@@ -894,8 +920,9 @@ def single_pipe(
                 is_primary = 0
                 if read.flag in [0, 16]:
                     is_primary = 1
+
                 reads_info_list.append(
-                    [pos_start, pos_end, is_primary, read.query_name]
+                    [pos_start, pos_end, is_primary, get_query_name(read)]
                 )
     samfile.close()
     # print('finish %s:%d-%d in %f seconds.'%(task[0], task[1], len(reads_info_list), time.time() - start_time))
@@ -950,91 +977,51 @@ def multi_run_wrapper(args):
     return single_pipe(*args)
 
 
+def temp_dir_empty(temporary_dir: str) -> bool:
+    """Check if temporary directory is finished or needs update
+
+    Args:
+        temporary_dir (Path): Used work dir
+
+    Returns:
+        bool: True if any necessary file in the workdir is empty or missing
+    """
+    temporary_dir = Path(temporary_dir)
+    for kind in ["DEL", "DUP", "INS", "INV", "TRA", "reads"]:
+        f = temporary_dir / f"{kind}.sigs"
+        try:
+            if f.stat().st_size == 0:
+                return True
+        except FileNotFoundError:
+            return True
+    return False
+
+
 def main_ctrl(args, argv):
     if not os.path.isfile(args.reference):
         raise FileNotFoundError("[Errno 2] No such file: '%s'" % args.reference)
-    if not os.path.exists(args.work_dir):
+    temporary_dir = Path(args.work_dir)
+    if not temporary_dir.is_dir:
         raise FileNotFoundError("[Errno 2] No such directory: '%s'" % args.work_dir)
+    # Apologise about the following line. I just can't fix all the silly directory handling here.
+    temporary_dir = str(temporary_dir) + "/"
 
-    samfile = pysam.AlignmentFile(args.input)
-    contig_num = len(samfile.get_index_statistics())
-    logging.info("The total number of chromsomes: %d" % (contig_num))
+    contigINFO = process_bam_file(args, temporary_dir, temp_dir_empty(temporary_dir))
 
-    Task_list = list()
-    chr_name_list = list()
-    contigINFO = list()
-    if args.work_dir[-1] == "/":
-        temporary_dir = args.work_dir
+    #'''
+    #'''
+    if temp_dir_empty(temporary_dir):
+        logging.info("Rebuilding signatures of structural variants.")
+        merge_signatures(args, temporary_dir)
     else:
-        temporary_dir = args.work_dir + "/"
-
-    ref_ = samfile.get_index_statistics()
-    for i in ref_:
-        chr_name = i[0]
-        chr_name_list.append(chr_name)
-        local_ref_len = samfile.get_reference_length(chr_name)
-        contigINFO.append([chr_name, local_ref_len])
-        if local_ref_len < args.batches:
-            Task_list.append([chr_name, 0, local_ref_len])
-        else:
-            pos = 0
-            task_round = int(local_ref_len / args.batches)
-            for j in range(task_round):
-                Task_list.append([chr_name, pos, pos + args.batches])
-                pos += args.batches
-            if pos < local_ref_len:
-                Task_list.append([chr_name, pos, local_ref_len])
-    bed_regions = load_bed(args.include_bed, Task_list)
-    #'''
-    analysis_pools = Pool(processes=int(args.threads))
-    os.mkdir("%ssignatures" % temporary_dir)
-    for i in range(len(Task_list)):
-        para = [
-            (
-                args.input,
-                args.min_size,
-                args.min_mapq,
-                args.max_split_parts,
-                args.min_read_len,
-                temporary_dir,
-                Task_list[i],
-                args.min_siglength,
-                args.merge_del_threshold,
-                args.merge_ins_threshold,
-                args.max_size,
-                None if bed_regions == None else bed_regions[i],
-            )
-        ]
-        analysis_pools.map_async(multi_run_wrapper, para)
-    analysis_pools.close()
-    analysis_pools.join()
-    #'''
-    #'''
-    logging.info("Rebuilding signatures of structural variants.")
-    merge_signatures(args, temporary_dir)
+        args.retain_work_dir = True
+        logging.info("Using signatures of structural variants from %s.", temporary_dir)
     #'''
     result = list()
 
     if args.Ivcf != None:
         # force calling
-        max_cluster_bias_dict = dict()
-        max_cluster_bias_dict["INS"] = args.max_cluster_bias_INS
-        max_cluster_bias_dict["DEL"] = args.max_cluster_bias_DEL
-        max_cluster_bias_dict["DUP"] = args.max_cluster_bias_DUP
-        max_cluster_bias_dict["INV"] = args.max_cluster_bias_INV
-        max_cluster_bias_dict["TRA"] = args.max_cluster_bias_TRA
-        threshold_gloab_dict = dict()
-        threshold_gloab_dict["INS"] = args.diff_ratio_merging_INS
-        threshold_gloab_dict["DEL"] = args.diff_ratio_merging_DEL
-
-        result = force_calling_chrom(
-            args.Ivcf,
-            temporary_dir,
-            max_cluster_bias_dict,
-            threshold_gloab_dict,
-            args.gt_round,
-            args.threads,
-        )
+        result = force_call_genotypes(args, temporary_dir)
 
     else:
         valuable_chr = load_valuable_chr(temporary_dir)
@@ -1156,19 +1143,96 @@ def main_ctrl(args, argv):
         semi_result = sorted(semi_result, key=lambda x: (x[0], int(x[2])))
         logging.info("Loading reference genome...")
         ref_g = pyfastx.Fasta(args.reference)
+        logging.info("Writing output...")
         generate_output(args, semi_result, contigINFO, argv, ref_g)
 
     if args.retain_work_dir:
         pass
     else:
         logging.info("Cleaning temporary files.")
-        cmd_remove_tempfile = "rm -r %ssignatures %s*.sigs" % (
-            temporary_dir,
-            temporary_dir,
-        )
+        cmd_remove_tempfile = f"rm -r {temporary_dir}/signatures {temporary_dir}/*.sigs"
         exe(cmd_remove_tempfile)
 
+
+def force_call_genotypes(args, temporary_dir):
+    max_cluster_bias_dict = dict()
+    max_cluster_bias_dict["INS"] = args.max_cluster_bias_INS
+    max_cluster_bias_dict["DEL"] = args.max_cluster_bias_DEL
+    max_cluster_bias_dict["DUP"] = args.max_cluster_bias_DUP
+    max_cluster_bias_dict["INV"] = args.max_cluster_bias_INV
+    max_cluster_bias_dict["TRA"] = args.max_cluster_bias_TRA
+    threshold_gloab_dict = dict()
+    threshold_gloab_dict["INS"] = args.diff_ratio_merging_INS
+    threshold_gloab_dict["DEL"] = args.diff_ratio_merging_DEL
+
+    result = force_calling_chrom(
+        args.Ivcf,
+        temporary_dir,
+        max_cluster_bias_dict,
+        threshold_gloab_dict,
+        args.gt_round,
+        args.threads,
+    )
+
+    return result
+
+
+def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
+    samfile = pysam.AlignmentFile(args.input)
+    contig_num = len(samfile.get_index_statistics())
+    logging.info("The total number of chromsomes: %d" % (contig_num))
+
+    Task_list = list()
+    chr_name_list = list()
+    contigINFO = list()
+
+    ref_ = samfile.get_index_statistics()
+    for i in ref_:
+        chr_name = i[0]
+        chr_name_list.append(chr_name)
+        local_ref_len = samfile.get_reference_length(chr_name)
+        contigINFO.append([chr_name, local_ref_len])
+        if local_ref_len < args.batches:
+            Task_list.append([chr_name, 0, local_ref_len])
+        else:
+            pos = 0
+            task_round = int(local_ref_len / args.batches)
+            for j in range(task_round):
+                Task_list.append([chr_name, pos, pos + args.batches])
+                pos += args.batches
+            if pos < local_ref_len:
+                Task_list.append([chr_name, pos, local_ref_len])
     samfile.close()
+    bed_regions = load_bed(args.include_bed, Task_list)
+    #'''
+    if update_temp_data:
+        process_alignments(args, temporary_dir, Task_list, bed_regions)
+    return contigINFO
+
+
+def process_alignments(args, temporary_dir, Task_list, bed_regions):
+    analysis_pools = Pool(processes=int(args.threads))
+    os.mkdir("%ssignatures" % temporary_dir)
+    for i in range(len(Task_list)):
+        para = [
+            (
+                args.input,
+                args.min_size,
+                args.min_mapq,
+                args.max_split_parts,
+                args.min_read_len,
+                temporary_dir,
+                Task_list[i],
+                args.min_siglength,
+                args.merge_del_threshold,
+                args.merge_ins_threshold,
+                args.max_size,
+                None if bed_regions == None else bed_regions[i],
+            )
+        ]
+        analysis_pools.map_async(multi_run_wrapper, para)
+    analysis_pools.close()
+    analysis_pools.join()
 
 
 def merge_signatures(args, temporary_dir):
@@ -1212,7 +1276,7 @@ def setupLogging(debug=False):
 
 def run(argv):
     args = parseArgs(argv)
-    setupLogging(False)
+    setupLogging(args.verbose)
     starttime = time.time()
     main_ctrl(args, argv)
     logging.info("Finished in %0.2f seconds." % (time.time() - starttime))

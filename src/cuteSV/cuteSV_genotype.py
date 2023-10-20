@@ -1,3 +1,4 @@
+import logging
 from cuteSV.cuteSV_Description import Generation_VCF_header
 from math import log10
 import numpy as np
@@ -245,197 +246,220 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
     file.write(
         "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n" % (args.sample)
     )
-    for i in semi_result:
-        if i[1] in ["DEL", "INS"]:
-            if abs(int(float(i[3]))) > args.max_size and args.max_size != -1:
-                continue
-            if abs(int(float(i[3]))) < args.min_size:
-                continue
-            if i[1] == "INS":
-                cal_end = int(i[2])
-            else:
-                cal_end = int(i[2]) + abs(int(float(i[3])))
-            info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};CIPOS={CIPOS};CILEN={CILEN};RE={RE};RNAMES={RNAMES}".format(
-                PRECISION="IMPRECISE" if i[8] == "0/0" else "PRECISE",
-                SVTYPE=i[1],
-                SVLEN=i[3],
-                END=str(cal_end),
-                CIPOS=i[5],
-                CILEN=i[6],
-                RE=i[4],
-                RNAMES=i[12] if args.report_readid else "NULL",
+    for variant in semi_result:
+        if (
+            variant[1] in {"INS", "DEL", "DUP", "INV"}
+            and abs(int(float(variant[3]))) > args.max_size
+            and args.max_size != -1
+        ):
+            logging.debug(
+                "Skipping due to size of %d: %s",
+                abs(int(float(variant[3]))),
+                str(variant),
             )
-            if action:
-                try:
-                    info_list += ";AF=" + str(
-                        round(int(i[4]) / (int(i[4]) + int(i[7])), 4)
-                    )
-                except:
-                    info_list += ";AF=."
-            if i[1] == "DEL":
-                info_list += ";STRAND=+-"
-            if i[11] == "." or i[11] == None:
-                filter_lable = "PASS"
-            else:
-                filter_lable = "PASS" if float(i[11]) >= 5.0 else "q5"
-            file.write(
-                "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
-                    CHR=i[0],
-                    POS=str(int(i[2])),
-                    ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
-                    REF=str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
-                    if i[1] == "INS"
-                    else str(
-                        ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])]
-                    ),
-                    ALT="%s"
-                    % (
-                        str(ref_g[i[0]][max(int(i[2]) - 1, 0)]) + i[13]
-                        if i[1] == "INS"
-                        else str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
-                    ),
-                    INFO=info_list,
-                    FORMAT="GT:DR:DV:PL:GQ",
-                    GT=i[8],
-                    DR=i[7],
-                    RE=i[4],
-                    PL=i[9],
-                    GQ=i[10],
-                    QUAL=i[11],
-                    PASS=filter_lable,
+            continue
+        if variant[1] in ["DEL", "INS"]:
+            if abs(int(float(variant[3]))) < args.min_size:
+                logging.debug(
+                    "Skipping due to short size of %d: %s",
+                    abs(int(float(variant[3]))),
+                    str(variant),
                 )
-            )
-            svid[i[1]] += 1
-        elif i[1] == "DUP":
-            if abs(int(float(i[3]))) > args.max_size and args.max_size != -1:
                 continue
-            cal_end = int(i[2]) + 1 + abs(int(float(i[3])))
-            info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND=-+;RNAMES={RNAMES}".format(
-                PRECISION="IMPRECISE" if i[6] == "0/0" else "PRECISE",
-                SVTYPE=i[1],
-                SVLEN=i[3],
-                END=str(cal_end),
-                RE=i[4],
-                RNAMES=i[10] if args.report_readid else "NULL",
-            )
-            if action:
-                try:
-                    info_list += ";AF=" + str(
-                        round(int(i[4]) / (int(i[4]) + int(i[5])), 4)
-                    )
-                except:
-                    info_list += ";AF=."
-            if i[9] == ".":
-                filter_lable = "PASS"
-            else:
-                filter_lable = "PASS" if float(i[9]) >= 5.0 else "q5"
-            file.write(
-                "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
-                    CHR=i[0],
-                    POS=str(int(i[2]) + 1),
-                    ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
-                    REF=str(ref_g[i[0]][int(i[2])]),
-                    ALT="<%s>" % (i[1]),
-                    INFO=info_list,
-                    FORMAT="GT:DR:DV:PL:GQ",
-                    GT=i[6],
-                    DR=i[5],
-                    RE=i[4],
-                    PL=i[7],
-                    GQ=i[8],
-                    QUAL=i[9],
-                    PASS=filter_lable,
-                )
-            )
-            svid[i[1]] += 1
-        elif i[1] == "INV":
-            if abs(int(float(i[3]))) > args.max_size and args.max_size != -1:
-                continue
-            cal_end = int(i[2]) + 1 + abs(int(float(i[3])))
-            info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND={STRAND};RNAMES={RNAMES}".format(
-                PRECISION="IMPRECISE" if i[6] == "0/0" else "PRECISE",
-                SVTYPE=i[1],
-                SVLEN=i[3],
-                END=str(cal_end),
-                RE=i[4],
-                STRAND=i[7],
-                RNAMES=i[11] if args.report_readid else "NULL",
-            )
-            if action:
-                try:
-                    info_list += ";AF=" + str(
-                        round(int(i[4]) / (int(i[4]) + int(i[5])), 4)
-                    )
-                except:
-                    info_list += ";AF=."
-            if i[10] == ".":
-                filter_lable = "PASS"
-            else:
-                filter_lable = "PASS" if float(i[10]) >= 5.0 else "q5"
-            file.write(
-                "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
-                    CHR=i[0],
-                    POS=str(int(i[2]) + 1),
-                    ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
-                    REF=str(ref_g[i[0]][int(i[2])]),
-                    ALT="<%s>" % (i[1]),
-                    INFO=info_list,
-                    FORMAT="GT:DR:DV:PL:GQ",
-                    GT=i[6],
-                    DR=i[5],
-                    RE=i[4],
-                    PL=i[8],
-                    GQ=i[9],
-                    QUAL=i[10],
-                    PASS=filter_lable,
-                )
-            )
-            svid[i[1]] += 1
+            output_INS_DEL(args, ref_g, svid, file, action, variant)
+        elif variant[1] == "DUP":
+            output_DUP(args, ref_g, svid, file, action, variant)
+        elif variant[1] == "INV":
+            output_INV(args, ref_g, svid, file, action, variant)
         else:
             # BND
             # info_list = "{PRECISION};SVTYPE={SVTYPE};CHR2={CHR2};END={END};RE={RE};RNAMES={RNAMES}".format(
-            info_list = "{PRECISION};SVTYPE={SVTYPE};RE={RE};RNAMES={RNAMES}".format(
-                PRECISION="IMPRECISE" if i[7] == "0/0" else "PRECISE",
-                SVTYPE="BND",
-                # CHR2 = i[3],
-                # END = str(int(i[4]) + 1),
-                RE=i[5],
-                RNAMES=i[11] if args.report_readid else "NULL",
+            logging.debug("Outputting as %s as BND.", variant[1])
+            output_BND(args, ref_g, svid, file, action, variant)
+
+
+def output_BND(args, ref_g, svid, file, action, variant):
+    info_list = "{PRECISION};SVTYPE={SVTYPE};RE={RE};RNAMES={RNAMES}".format(
+        PRECISION="IMPRECISE" if variant[7] == "0/0" else "PRECISE",
+        SVTYPE="BND",
+        # CHR2 = i[3],
+        # END = str(int(i[4]) + 1),
+        RE=variant[5],
+        RNAMES=variant[11] if args.report_readid else "NULL",
+    )
+    if action:
+        try:
+            info_list += ";AF=" + str(
+                round(int(variant[5]) / (int(variant[5]) + int(variant[6])), 4)
             )
-            if action:
-                try:
-                    info_list += ";AF=" + str(
-                        round(int(i[5]) / (int(i[5]) + int(i[6])), 4)
-                    )
-                except:
-                    info_list += ";AF=."
-            if i[10] == ".":
-                filter_lable = "PASS"
-            else:
-                filter_lable = "PASS" if float(i[10]) >= 5.0 else "q5"
-            try:
-                reff = str(ref_g[i[0]][int(i[2])])
-            except:
-                reff = "N"
-            file.write(
-                "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
-                    CHR=i[0],
-                    POS=str(int(i[2]) + 1),
-                    ID="cuteSV.%s.%d" % ("BND", svid["BND"]),
-                    REF=reff,
-                    ALT=i[1],
-                    INFO=info_list,
-                    FORMAT="GT:DR:DV:PL:GQ",
-                    GT=i[7],
-                    DR=i[6],
-                    RE=i[5],
-                    PL=i[8],
-                    GQ=i[9],
-                    QUAL=i[10],
-                    PASS=filter_lable,
-                )
+        except:
+            info_list += ";AF=."
+    if variant[10] == ".":
+        filter_lable = "PASS"
+    else:
+        filter_lable = "PASS" if float(variant[10]) >= 5.0 else "q5"
+    try:
+        reff = str(ref_g[variant[0]][int(variant[2])])
+    except:
+        reff = "N"
+    file.write(
+        "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
+            CHR=variant[0],
+            POS=str(int(variant[2]) + 1),
+            ID="cuteSV.%s.%d" % ("BND", svid["BND"]),
+            REF=reff,
+            ALT=variant[1],
+            INFO=info_list,
+            FORMAT="GT:DR:DV:PL:GQ",
+            GT=variant[7],
+            DR=variant[6],
+            RE=variant[5],
+            PL=variant[8],
+            GQ=variant[9],
+            QUAL=variant[10],
+            PASS=filter_lable,
+        )
+    )
+    svid["BND"] += 1
+
+
+def output_INV(args, ref_g, svid, file, action, variant):
+    cal_end = int(variant[2]) + 1 + abs(int(float(variant[3])))
+    info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND={STRAND};RNAMES={RNAMES}".format(
+        PRECISION="IMPRECISE" if variant[6] == "0/0" else "PRECISE",
+        SVTYPE=variant[1],
+        SVLEN=variant[3],
+        END=str(cal_end),
+        RE=variant[4],
+        STRAND=variant[7],
+        RNAMES=variant[11] if args.report_readid else "NULL",
+    )
+    if action:
+        try:
+            info_list += ";AF=" + str(
+                round(int(variant[4]) / (int(variant[4]) + int(variant[5])), 4)
             )
-            svid["BND"] += 1
+        except:
+            info_list += ";AF=."
+    if variant[10] == ".":
+        filter_lable = "PASS"
+    else:
+        filter_lable = "PASS" if float(variant[10]) >= 5.0 else "q5"
+    file.write(
+        "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
+            CHR=variant[0],
+            POS=str(int(variant[2]) + 1),
+            ID="cuteSV.%s.%d" % (variant[1], svid[variant[1]]),
+            REF=str(ref_g[variant[0]][int(variant[2])]),
+            ALT="<%s>" % (variant[1]),
+            INFO=info_list,
+            FORMAT="GT:DR:DV:PL:GQ",
+            GT=variant[6],
+            DR=variant[5],
+            RE=variant[4],
+            PL=variant[8],
+            GQ=variant[9],
+            QUAL=variant[10],
+            PASS=filter_lable,
+        )
+    )
+    svid[variant[1]] += 1
+
+
+def output_DUP(args, ref_g, svid, file, action, variant):
+    cal_end = int(variant[2]) + 1 + abs(int(float(variant[3])))
+    info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND=-+;RNAMES={RNAMES}".format(
+        PRECISION="IMPRECISE" if variant[6] == "0/0" else "PRECISE",
+        SVTYPE=variant[1],
+        SVLEN=variant[3],
+        END=str(cal_end),
+        RE=variant[4],
+        RNAMES=variant[10] if args.report_readid else "NULL",
+    )
+    if action:
+        try:
+            info_list += ";AF=" + str(
+                round(int(variant[4]) / (int(variant[4]) + int(variant[5])), 4)
+            )
+        except:
+            info_list += ";AF=."
+    if variant[9] == ".":
+        filter_lable = "PASS"
+    else:
+        filter_lable = "PASS" if float(variant[9]) >= 5.0 else "q5"
+    file.write(
+        "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
+            CHR=variant[0],
+            POS=str(int(variant[2]) + 1),
+            ID="cuteSV.%s.%d" % (variant[1], svid[variant[1]]),
+            REF=str(ref_g[variant[0]][int(variant[2])]),
+            ALT="<%s>" % (variant[1]),
+            INFO=info_list,
+            FORMAT="GT:DR:DV:PL:GQ",
+            GT=variant[6],
+            DR=variant[5],
+            RE=variant[4],
+            PL=variant[7],
+            GQ=variant[8],
+            QUAL=variant[9],
+            PASS=filter_lable,
+        )
+    )
+    svid[variant[1]] += 1
+
+
+def output_INS_DEL(args, ref_g, svid, file, action, i):
+    if i[1] == "INS":
+        cal_end = int(i[2])
+    else:
+        cal_end = int(i[2]) + abs(int(float(i[3])))
+    info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};CIPOS={CIPOS};CILEN={CILEN};RE={RE};RNAMES={RNAMES}".format(
+        PRECISION="IMPRECISE" if i[8] == "0/0" else "PRECISE",
+        SVTYPE=i[1],
+        SVLEN=i[3],
+        END=str(cal_end),
+        CIPOS=i[5],
+        CILEN=i[6],
+        RE=i[4],
+        RNAMES=i[12] if args.report_readid else "NULL",
+    )
+    if action:
+        try:
+            info_list += ";AF=" + str(round(int(i[4]) / (int(i[4]) + int(i[7])), 4))
+        except:
+            info_list += ";AF=."
+    if i[1] == "DEL":
+        info_list += ";STRAND=+-"
+    if i[11] == "." or i[11] == None:
+        filter_lable = "PASS"
+    else:
+        filter_lable = "PASS" if float(i[11]) >= 5.0 else "q5"
+    file.write(
+        "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
+            CHR=i[0],
+            POS=str(int(i[2])),
+            ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
+            REF=str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+            if i[1] == "INS"
+            else str(ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])]),
+            ALT="%s"
+            % (
+                str(ref_g[i[0]][max(int(i[2]) - 1, 0)]) + i[13]
+                if i[1] == "INS"
+                else str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+            ),
+            INFO=info_list,
+            FORMAT="GT:DR:DV:PL:GQ",
+            GT=i[8],
+            DR=i[7],
+            RE=i[4],
+            PL=i[9],
+            GQ=i[10],
+            QUAL=i[11],
+            PASS=filter_lable,
+        )
+    )
+    svid[i[1]] += 1
 
 
 def generate_pvcf(args, result, contigINFO, argv, ref_g):

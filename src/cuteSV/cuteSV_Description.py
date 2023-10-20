@@ -92,6 +92,12 @@ def parseArgs(argv):
         type=int,
     )
     parser.add_argument(
+        "--verbose",
+        help="Verbose output.[%(default)s]",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "-b",
         "--batches",
         help="Batch of genome segmentation interval.[%(default)s]",
