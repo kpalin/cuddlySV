@@ -35,20 +35,6 @@ import sys
 import time
 import gc
 
-dic_starnd = {1: "+", 2: "-"}
-signal = {1 << 2: 0, 1 >> 1: 1, 1 << 4: 2, 1 << 11: 3, 1 << 4 | 1 << 11: 4}
-"""
-    1 >> 1 means normal_foward read
-    1 << 2 means unmapped read
-    1 << 4 means reverse_complement read
-    1 << 11 means supplementary alignment read
-    1 << 4 | 1 << 11 means supplementary alignment with reverse_complement read
-"""
-
-
-def detect_flag(Flag):
-    back_sig = signal[Flag] if Flag in signal else 0
-    return back_sig
 
 
 def get_query_name(read: pysam.AlignedSegment) -> str:
@@ -728,7 +714,7 @@ def generate_combine_sigs(sigs, Chr_name, read_name, svtype, candidate, merge_di
 
 
 def parse_read(
-    read,
+    read:pysam.AlignedSegment,
     Chr_name,
     SV_size,
     min_mapq,
@@ -745,7 +731,7 @@ def parse_read(
     Combine_sig_in_same_read_ins = list()
     Combine_sig_in_same_read_del = list()
 
-    process_signal = detect_flag(read.flag)
+    
     if read.mapq >= min_mapq:
         pos_start = read.reference_start  # 0-based
         pos_end = read.reference_end
@@ -825,18 +811,18 @@ def parse_read(
         candidate,
         merge_del_threshold,
     )
-
-    if process_signal == 1 or process_signal == 2:  # 0 / 16
+    
+    if read.flag==0 or read.flag == pysam.FREVERSE:
         Tags = read.get_tags()
         if read.mapq >= min_mapq:
-            if process_signal == 1:
+            if not read.is_reverse:
                 primary_info = [
                     softclip_left,
                     read.query_length - softclip_right,
                     pos_start,
                     pos_end,
                     Chr_name,
-                    dic_starnd[process_signal],
+                    "+",
                 ]
             else:
                 primary_info = [
@@ -845,7 +831,7 @@ def parse_read(
                     pos_start,
                     pos_end,
                     Chr_name,
-                    dic_starnd[process_signal],
+                    "-",
                 ]
         else:
             primary_info = []
@@ -888,7 +874,8 @@ def single_pipe(
     samfile = pysam.AlignmentFile(sam_path)
 
     for read in samfile.fetch(Chr_name, task[1], task[2]):
-        if read.flag == 256 or read.flag == 272:
+        if read.is_secondary:
+            # Skip secondary alignments
             continue
         pos_start = read.reference_start  # 0-based
         pos_end = read.reference_end
@@ -902,6 +889,7 @@ def single_pipe(
                     break
         else:
             in_bed = True
+            
         if read.reference_start >= task[1] and in_bed:
             read_candidate = parse_read(
                 read,
@@ -918,7 +906,8 @@ def single_pipe(
             candidate.extend(read_candidate)
             if read.mapq >= min_mapq:
                 is_primary = 0
-                if read.flag in [0, 16]:
+                if read.flag in [0, pysam.FREVERSE]: 
+                    # Read is primary if not paired, secondary supplementary, duplicated or qcfailed.
                     is_primary = 1
 
                 reads_info_list.append(
@@ -1024,7 +1013,12 @@ def main_ctrl(args, argv):
         result = force_call_genotypes(args, temporary_dir)
 
     else:
+        # Loading Dict: SVTYPE->chrom->signature
+        # import cuteSV
+        # global valuable_chr
         valuable_chr = load_valuable_chr(temporary_dir)
+        # valuable_chr = cuteSV.valuable_chr
+        # valuable_chr should be made global here to avoid reading the input files many times.
 
         logging.info("Clustering structural variants.")
         analysis_pools = Pool(processes=int(args.threads))
@@ -1124,6 +1118,7 @@ def main_ctrl(args, argv):
 
         analysis_pools.close()
         analysis_pools.join()
+        del valuable_chr
 
     logging.info("Writing to your output file.")
 

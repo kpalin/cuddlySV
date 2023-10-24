@@ -274,7 +274,12 @@ def generate_output(args, semi_result, contigINFO, argv, ref_g):
         else:
             # BND
             # info_list = "{PRECISION};SVTYPE={SVTYPE};CHR2={CHR2};END={END};RE={RE};RNAMES={RNAMES}".format(
-            logging.debug("Outputting as %s as BND.", variant[1])
+            logging.debug(
+                "Outputting %s:%d  %s as BND.",
+                variant[0],
+                int(variant[2]) + 1,
+                variant[1],
+            )
             output_BND(args, ref_g, svid, file, action, variant)
 
 
@@ -434,20 +439,29 @@ def output_INS_DEL(args, ref_g, svid, file, action, i):
         filter_lable = "PASS"
     else:
         filter_lable = "PASS" if float(i[11]) >= 5.0 else "q5"
+
+    # Infer alleles
+    if i[1] == "INS":
+        REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+        ALT = str(ref_g[i[0]][max(int(i[2]) - 1, 0)]) + i[13]
+    elif i[1] == "DEL":
+        if abs(float(i[3])) <= (args.max_ref_allele):
+            REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])])
+            ALT = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+        else:
+            #logging.debug("Not reporting long reference allele for %s", str(i[:4]))
+            REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+            ALT = "<DEL>"
+    else:
+        raise ValueError(args=i)
+
     file.write(
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=i[0],
             POS=str(int(i[2])),
             ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
-            REF=str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
-            if i[1] == "INS"
-            else str(ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])]),
-            ALT="%s"
-            % (
-                str(ref_g[i[0]][max(int(i[2]) - 1, 0)]) + i[13]
-                if i[1] == "INS"
-                else str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
-            ),
+            REF=REF,
+            ALT=ALT,
             INFO=info_list,
             FORMAT="GT:DR:DV:PL:GQ",
             GT=i[8],

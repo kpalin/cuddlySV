@@ -120,7 +120,12 @@ def parseArgs(argv):
         help="Enable to report supporting read ids for each SV.",
         action="store_true",
     )
-
+    parser.add_argument(
+        "--max_ref_allele",
+        help="Maximum length of reported reference allele for deletions. Longer variants use ALT allele <DEL>.[%(default)s]",
+        default=100,
+        type=int,
+    )
     # **************Parameters in signatures collection******************
     GroupSignaturesCollect = parser.add_argument_group("Collection of SV signatures")
     GroupSignaturesCollect.add_argument(

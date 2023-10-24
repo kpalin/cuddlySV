@@ -57,6 +57,7 @@ def resolution_DEL(
     semi_del_cluster.append([0, 0, ""])
     candidate_single_SV = list()
 
+    logging.debug("Reading DEL signatures from files.")
     file = open("%s%s.sigs" % (path, "DEL"), "r")
     for line in file:
         seq = line.strip("\n").split("\t")
@@ -116,7 +117,7 @@ def resolution_DEL(
         candidate_single_SV_gt = call_gt(
             path, chr, candidate_single_SV, max_cluster_bias, "DEL"
         )
-        logging.info("Finished %s:%s." % (chr, "DEL"))
+        logging.info("Finished GT %s:%s." % (chr, "DEL"))
         return candidate_single_SV_gt
     else:
         logging.info("Finished %s:%s." % (chr, "DEL"))
