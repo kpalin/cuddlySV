@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-
 """ 
  * All rights Reserved, Designed By HIT-Bioinformatics   
  * @Title: cuteSV 
  * @author: tjiang & sqcao
  * @date: June 21st 2023
- * @version V2.0.3
+ * @version V2.1.0+dev
 """
 
 from pathlib import Path
@@ -35,6 +34,63 @@ import sys
 import time
 import gc
 
+
+def get_cigar_ref_length(cigar: str) -> int:
+    "Return the length of reference consumed by the cigar string"
+    import re
+
+    cig_parts = re.findall(r"(\d+)(\D)", cigar)
+
+    consumed_ref = sum(int(l) for l, op in cig_parts if op in "MDN=X")
+
+    return consumed_ref
+
+
+def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.9) -> bool:
+    "Check if the aligned_segment is false 1d2 read, i.e. aligned in two parts, overlapping, in opposite strands"
+    # Extract the reference name, start, and end coordinates of the aligned segment
+    ref_name = aligned_segment.reference_name
+    start = aligned_segment.reference_start
+    end = aligned_segment.reference_end
+
+    # Extract the SA tag and split it into supplementary alignments
+    try:
+        sa_tag = aligned_segment.get_tag("SA").rstrip(";").split(";")
+    except KeyError:
+        return False
+    if len(sa_tag) != 1:
+        return False
+
+    # Check for each supplementary alignment if it overlaps with the aligned segment
+    for sa_entry in sa_tag:
+        fields = sa_entry.split(",")
+        sa_ref_name = fields[0]
+        sa_start = int(fields[1]) - 1  # to zero based like pysam
+        sa_is_forward = 1 if fields[2] == "+" else 0
+        sa_cigar = fields[3]
+        sa_mapq = int(fields[4])
+
+        if sa_ref_name != ref_name:
+            # Different contig
+            continue
+        if sa_is_forward == aligned_segment.is_forward:
+            # Same strand.
+            continue
+
+        sa_ref_len = get_cigar_ref_length(sa_cigar)
+        sa_end = sa_start + sa_ref_len
+
+        # Calculate the length of the overlap
+        overlap_length = min(end, sa_end) - max(start, sa_start)
+
+        # Calculate the percentage of overlap
+        ref_len = min(end - start, sa_ref_len)
+        overlap_percentage = overlap_length / ref_len
+
+        if overlap_percentage >= overlap_threshold:
+            return True
+
+    return False
 
 
 def get_query_name(read: pysam.AlignedSegment) -> str:
@@ -714,7 +770,7 @@ def generate_combine_sigs(sigs, Chr_name, read_name, svtype, candidate, merge_di
 
 
 def parse_read(
-    read:pysam.AlignedSegment,
+    read: pysam.AlignedSegment,
     Chr_name,
     SV_size,
     min_mapq,
@@ -727,11 +783,17 @@ def parse_read(
 ):
     if read.query_length < min_read_len:
         return []
+    is_1d2_chimera = is_1d2_read(read)
+
+    if is_1d2_chimera and read.is_supplementary:
+        # Only use the primary AlignedSegment for 1d2 chimera reads.
+        # logging.debug("Skipping %s",(read.query_name))
+        return []
     candidate = list()
     Combine_sig_in_same_read_ins = list()
     Combine_sig_in_same_read_del = list()
+    from pysam import CSOFT_CLIP, CHARD_CLIP, CMATCH, CINS, CDEL, CEQUAL, CDIFF
 
-    
     if read.mapq >= min_mapq:
         pos_start = read.reference_start  # 0-based
         pos_end = read.reference_end
@@ -742,32 +804,32 @@ def parse_read(
         hardclip_left = 0
         hardclip_right = 0
         shift_ins_read = 0
-        if read.cigar[0][0] == 4:
+        if read.cigar[0][0] == CSOFT_CLIP:
             softclip_left = read.cigar[0][1]
-        if read.cigar[0][0] == 5:
+        if read.cigar[0][0] == CHARD_CLIP:
             hardclip_left = read.cigar[0][1]
 
         for element in read.cigar:
-            if element[0] in [0, 7, 8]:
+            if element[0] in [CMATCH, CEQUAL, CDIFF]:
                 shift_del += element[1]
             if (
-                element[0] == 2 and element[1] < min_siglength
+                element[0] == CDEL and element[1] < min_siglength
             ):  ## changed SV_size to min_siglength
                 shift_del += element[1]
             if (
-                element[0] == 2 and element[1] >= min_siglength
+                element[0] == CDEL and element[1] >= min_siglength
             ):  ## changed SV_size to min_siglength
                 Combine_sig_in_same_read_del.append([pos_start + shift_del, element[1]])
                 shift_del += element[1]
 
             # calculate offset of an ins sig in read
-            if element[0] != 2:
+            if element[0] != CDEL:
                 shift_ins_read += element[1]
 
-            if element[0] in [0, 2, 7, 8]:
+            if element[0] in [CMATCH, CDEL, CEQUAL, CDIFF]:
                 shift_ins += element[1]
             if (
-                element[0] == 1 and element[1] >= min_siglength
+                element[0] == CINS and element[1] >= min_siglength
             ):  ## changed SV_size to min_siglength
                 Combine_sig_in_same_read_ins.append(
                     [
@@ -784,9 +846,9 @@ def parse_read(
                     ]
                 )
 
-        if read.cigar[-1][0] == 4:
+        if read.cigar[-1][0] == CSOFT_CLIP:
             softclip_right = read.cigar[-1][1]
-        if read.cigar[-1][0] == 5:
+        if read.cigar[-1][0] == CHARD_CLIP:
             hardclip_right = read.cigar[-1][1]
 
         if hardclip_left != 0:
@@ -811,9 +873,9 @@ def parse_read(
         candidate,
         merge_del_threshold,
     )
-    
-    if read.flag==0 or read.flag == pysam.FREVERSE:
-        Tags = read.get_tags()
+
+    if read.flag == 0 or read.flag == pysam.FREVERSE:
+        # Exclude duplicate, supplemetary, secondary, qcfail, paired etc. reads.
         if read.mapq >= min_mapq:
             if not read.is_reverse:
                 primary_info = [
@@ -836,9 +898,14 @@ def parse_read(
         else:
             primary_info = []
 
-        for i in Tags:
-            if i[0] == "SA":
-                Supplementary_info = i[1].split(";")[:-1]
+        if not is_1d2_chimera:
+            # Ignore the false chimeric alignment for the false 1d2 reads
+            try:
+                SAtag = read.get_tag("SA")
+            except KeyError:
+                SAtag = None
+            if not SAtag is None:
+                Supplementary_info = SAtag.split(";")[:-1]
                 organize_split_signal(
                     primary_info,
                     Supplementary_info,
@@ -867,7 +934,10 @@ def single_pipe(
     merge_ins_threshold,
     MaxSize,
     bed_regions,
+    verbose,
 ):
+    setupLogging(verbose)
+    logging.debug("Hello World! from task %s", str(task))
     candidate = list()
     reads_info_list = list()
     Chr_name = task[0]
@@ -889,7 +959,7 @@ def single_pipe(
                     break
         else:
             in_bed = True
-            
+
         if read.reference_start >= task[1] and in_bed:
             read_candidate = parse_read(
                 read,
@@ -906,7 +976,7 @@ def single_pipe(
             candidate.extend(read_candidate)
             if read.mapq >= min_mapq:
                 is_primary = 0
-                if read.flag in [0, pysam.FREVERSE]: 
+                if read.flag in [0, pysam.FREVERSE]:
                     # Read is primary if not paired, secondary supplementary, duplicated or qcfailed.
                     is_primary = 1
 
@@ -1013,12 +1083,7 @@ def main_ctrl(args, argv):
         result = force_call_genotypes(args, temporary_dir)
 
     else:
-        # Loading Dict: SVTYPE->chrom->signature
-        # import cuteSV
-        # global valuable_chr
         valuable_chr = load_valuable_chr(temporary_dir)
-        # valuable_chr = cuteSV.valuable_chr
-        # valuable_chr should be made global here to avoid reading the input files many times.
 
         logging.info("Clustering structural variants.")
         analysis_pools = Pool(processes=int(args.threads))
@@ -1223,6 +1288,7 @@ def process_alignments(args, temporary_dir, Task_list, bed_regions):
                 args.merge_ins_threshold,
                 args.max_size,
                 None if bed_regions == None else bed_regions[i],
+                args.verbose,
             )
         ]
         analysis_pools.map_async(multi_run_wrapper, para)
@@ -1264,9 +1330,10 @@ def merge_signatures(args, temporary_dir):
 
 def setupLogging(debug=False):
     logLevel = logging.DEBUG if debug else logging.INFO
-    logFormat = "%(asctime)s [%(levelname)s] %(message)s"
+    logFormat = "%(asctime)s [%(levelname)s:%(process)d] %(message)s"
     logging.basicConfig(stream=sys.stderr, level=logLevel, format=logFormat)
     logging.info("Running %s" % " ".join(sys.argv))
+    logging.debug("Since debug is %s, using logLevel %s", str(debug), str(logLevel))
 
 
 def run(argv):

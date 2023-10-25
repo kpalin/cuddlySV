@@ -1,7 +1,11 @@
 import logging
+from typing import Dict, List, Tuple
 from cuteSV.cuteSV_Description import Generation_VCF_header
 from math import log10
 import numpy as np
+from collections import namedtuple
+
+ChrReadInfo = namedtuple("ReadInfo", ("START", "STOP", "PRIMARY", "READ_NAME"))
 
 err = 0.1
 prior = float(1 / 3)
@@ -30,17 +34,34 @@ def rescale_read_counts(c0, c1, max_allowed_reads=100):
     return c0, c1
 
 
-def cal_GL(c0, c1):
-    # Approximate adjustment of events with larger read depth
-    c0, c1 = rescale_read_counts(c0, c1)
-    # original genotype likelihood
-    # ori_GL00 = np.float64(pow((1-err), c0)*pow(err, c1)*comb(c0+c1,c0)*(1-prior)/2)
-    # ori_GL11 = np.float64(pow(err, c0)*pow((1-err), c1)*comb(c0+c1,c0)*(1-prior)/2)
-    # ori_GL01 = np.float64(pow(0.5, c0+c1)*comb(c0+c1,c0)*prior)
+def cal_GL(DR: int, DV: int) -> Tuple[str, str, int, int]:
+    """Calculate genotype, likelihoods and qualitites
 
-    ori_GL00 = np.float64(pow((1 - err), c0) * pow(err, c1) * (1 - prior) / 2)
-    ori_GL11 = np.float64(pow(err, c0) * pow((1 - err), c1) * (1 - prior) / 2)
-    ori_GL01 = np.float64(pow(0.5, c0 + c1) * prior)
+    Args:
+        DR (int): Number of Reference supporting reads
+        DV (int): Number of Variant/ALT supporting reads
+
+    Returns:
+        Tuple[str,str,int,int]: (Genotype,Likelihoods,GQ,QUAL)
+    """
+    # Approximate adjustment of events with larger read depth
+    DR, DV = rescale_read_counts(DR, DV)
+    # original genotype likelihood
+    # ori_GL00 = np.float64(pow((1-err), DR)*pow(err, DV)*comb(DR+DV,DR)*(1-prior)/2)
+    # ori_GL11 = np.float64(pow(err, DR)*pow((1-err), DV)*comb(DR+DV,DR)*(1-prior)/2)
+    # ori_GL01 = np.float64(pow(0.5, DR+DV)*comb(DR+DV,DR)*prior)
+
+    ori_GL00 = np.float64(pow((1 - err), DR) * pow(err, DV) * (1 - prior) / 2)
+    ori_GL11 = np.float64(pow(err, DR) * pow((1 - err), DV) * (1 - prior) / 2)
+    ori_GL01 = np.float64(pow(0.5, DR + DV) * prior)
+
+    # log10_ori_GL00 = (
+    #     DR * np.log10(1 - err) + DV * np.log10(err) + np.log10((1 - prior) / 2)
+    # )
+    # log10_ori_GL11 = (
+    #     DR * np.log10(err) + DV * np.log10(1 - err) + np.log10((1 - prior) / 2)
+    # )
+    # log10_ori_GL01 = (DR + DV) * np.log10(0.5) + np.log10(prior)
 
     # normalized genotype likelihood
     prob = list(
@@ -103,79 +124,115 @@ def count_coverage(chr, s, e, f, read_count, up_bound, itround):
     return status
 
 
-def overlap_cover(svs_list, reads_list):
+def overlap_cover(
+    svs_list: Tuple[int, int], reads_list: List[ChrReadInfo]
+) -> Tuple[Dict[int, int], Dict[int, int], Dict[int, str]]:
+    """Calculating something with sweepline method
+
+    Args:
+        svs_list (Tuple[int, int]): List of start,end positions of SV:s_ reads_list
+        (List[ChrReadInfo]): List of read start,end,primary,name:s
+
+    Returns:
+        (iteration, primary_num, cover): Dictionaries indexed to/by svs_list,
+                                        1. giving number of overlapping reads,
+                                        2. number of overlapping primary alignments,
+                                        3. names of reads covering the SV breaks.
+    """
     # [(10024, 12024), (89258, 91258), ...]
     # [[10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'], [10000, 17490, 1, 'm54238_180901_011437/44762027/ccs'], ...]
     sort_list = list()
-    idx = 0
-    for i in reads_list:
-        sort_list.append([i[0], 1, idx, i[2], i[3]])
-        sort_list.append([i[1], 2, idx, i[2], i[3]])
-        idx += 1
-    idx = 0
-    for i in svs_list:
-        sort_list.append([i[0], 3, idx])
-        sort_list.append([i[1], 0, idx])
-        idx += 1
-    sort_list = sorted(sort_list, key=lambda x: (x[0], x[1]))
-    svs_set = set()
-    read_set = set()
-    overlap_dict = dict()
-    cover_dict = dict()
+    from enum import Enum
+
+    Transition = Enum("Transition", ["SVend", "ReadStart", "ReadEnd", "SVstart"])
+
+    for sv_idx, read in enumerate(reads_list):
+        sort_list.append([read[0], Transition.ReadStart, sv_idx, read[2], read[3]])
+        sort_list.append([read[1], Transition.ReadEnd, sv_idx, read[2], read[3]])
+
+    for sv_idx, sv in enumerate(svs_list):
+        sort_list.append([sv[0], Transition.SVstart, sv_idx])
+        sort_list.append([sv[1], Transition.SVend, sv_idx])
+
+    # Sort list by position, starts before ends when equeal.
+    sort_list = sorted(sort_list, key=lambda x: (x[0], x[1].value))
+    svs_set = set()  # indices of SVs within the sweepline
+    read_set = set()  # indicies of the reads within the sweepline
+    overlap_dict = (
+        dict()
+    )  # dictionary of SV-index -> { idxes of reads overlapping the SV}
+    cover_dict = (
+        dict()
+    )  # dictionary of SV-index -> { idxes of reads overlapping the breaks}
     for node in sort_list:
-        if node[1] == 1:  # set2(read) left
+        if node[1] == Transition.ReadStart:  # set2(read) left
             read_set.add(node[2])
-            for x in svs_set:
-                if svs_list[x][1] == node[0]:
+            for read_idx in svs_set:
+                if (
+                    svs_list[read_idx][1] == node[0]
+                ):  # The read does not overlap SV that ends at the read start position.
                     continue
-                if x not in overlap_dict:
-                    overlap_dict[x] = set()
-                overlap_dict[x].add(node[2])
-        elif node[1] == 2:  # set2(read) right
+                if read_idx not in overlap_dict:
+                    overlap_dict[read_idx] = set()
+                overlap_dict[read_idx].add(node[2])
+        elif node[1] == Transition.ReadEnd:  # set2(read) right
             read_set.remove(node[2])
-        elif node[1] == 3:  # set1(sv) left
+        elif node[1] == Transition.SVstart:  # set1(sv) left
             svs_set.add(node[2])
-            overlap_dict[node[2]] = set()
-            for x in read_set:
-                overlap_dict[node[2]].add(x)
-            cover_dict[node[2]] = set()
-            for x in read_set:
-                cover_dict[node[2]].add(x)
-        elif node[1] == 0:  # set1(sv) right
+            overlap_dict[node[2]] = set(read_set)
+            cover_dict[node[2]] = set(read_set)
+
+        elif node[1] == Transition.SVend:  # set1(sv) right
             svs_set.remove(node[2])
-            temp_set = set()
-            for x in read_set:
-                temp_set.add(x)
-            cover_dict[node[2]] = cover_dict[node[2]] & temp_set
+            cover_dict[node[2]] = cover_dict[node[2]] & read_set
+
     cover2_dict = dict()
     iteration_dict = dict()
     primary_num_dict = dict()
-    for idx in cover_dict:
-        iteration_dict[idx] = len(overlap_dict[idx])
-        primary_num_dict[idx] = 0
-        for x in overlap_dict[idx]:
-            if reads_list[x][2] == 1:
-                primary_num_dict[idx] += 1
-        cover2_dict[idx] = set()
-        for x in cover_dict[idx]:
-            if reads_list[x][2] == 1:
-                cover2_dict[idx].add(reads_list[x][3])
+    for sv_idx in cover_dict:
+        iteration_dict[sv_idx] = len(overlap_dict[sv_idx])
+        primary_num_dict[sv_idx] = 0
+        for read_idx in overlap_dict[sv_idx]:
+            if reads_list[read_idx][2] == 1:
+                primary_num_dict[sv_idx] += 1
+        cover2_dict[sv_idx] = set()
+        for read_idx in cover_dict[sv_idx]:
+            if reads_list[read_idx][2] == 1:
+                cover2_dict[sv_idx].add(reads_list[read_idx][3])
     # duipai(svs_list, reads_list, iteration_dict, primary_num_dict, cover2_dict)
     return iteration_dict, primary_num_dict, cover2_dict
 
 
-def assign_gt(iteration_dict, primary_num_dict, cover_dict, read_id_dict):
+def assign_gt(
+    iteration_dict: Dict[int, int],
+    primary_num_dict: Dict[int, int],
+    cover_dict: Dict[int, str],
+    read_id_dict: Dict[int, str],
+) -> List[Tuple[int, int, int, int, int, int]]:
+    """Assign genotype and calculate some format values for VCF output
+
+    Args:
+        iteration_dict (Dict[int, int]): _description_
+        primary_num_dict (Dict[int, int]): _description_
+        cover_dict (Dict[int, str]): _description_
+        read_id_dict (Dict[int, str]): _description_
+
+    Returns:
+        List[Tuple[int,int,int,int,int,int]]: (DV, DR, GT, GL,GQ, QUAL)
+    """
     assign_list = list()
-    for idx in read_id_dict:
-        iteration = iteration_dict[idx]
-        primary_num = primary_num_dict[idx]
-        read_count = cover_dict[idx]
+    for sv_idx in read_id_dict:
+        iteration = iteration_dict[sv_idx]
+        primary_num = primary_num_dict[sv_idx]
+        read_count = cover_dict[sv_idx]
         DR = 0
         for query in read_count:
-            if query not in read_id_dict[idx]:
-                DR += 1
-        GT, GL, GQ, QUAL = cal_GL(DR, len(read_id_dict[idx]))
-        assign_list.append([len(read_id_dict[idx]), DR, GT, GL, GQ, QUAL])
+            if query not in read_id_dict[sv_idx]:
+                DR += 1  # Read overalps breakpoint, but does not support the SV
+
+        DV = len(read_id_dict[sv_idx])
+        GT, GL, GQ, QUAL = cal_GL(DR, DV)
+        assign_list.append((DV, DR, GT, GL, GQ, QUAL))
     return assign_list
 
 
@@ -449,7 +506,7 @@ def output_INS_DEL(args, ref_g, svid, file, action, i):
             REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])])
             ALT = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
         else:
-            #logging.debug("Not reporting long reference allele for %s", str(i[:4]))
+            # logging.debug("Not reporting long reference allele for %s", str(i[:4]))
             REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
             ALT = "<DEL>"
     else:

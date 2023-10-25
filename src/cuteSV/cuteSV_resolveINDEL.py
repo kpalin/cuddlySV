@@ -1,5 +1,6 @@
+from collections import namedtuple
 import numpy as np
-from cuteSV.cuteSV_genotype import cal_CIPOS, overlap_cover, assign_gt
+from cuteSV.cuteSV_genotype import cal_CIPOS, overlap_cover, assign_gt, ChrReadInfo
 import logging
 
 """
@@ -523,8 +524,10 @@ def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias, svtype):
         seq = line.strip().split("\t")
         if seq[0] != chr:
             continue
-        reads_list.append([int(seq[1]), int(seq[2]), int(seq[3]), seq[4]])
+        reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
+        #reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
     readsfile.close()
+    
     svs_list = list()
     for item in candidate_single_SV:
         svs_list.append(
