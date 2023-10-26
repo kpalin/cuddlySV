@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 from cuteSV.cuteSV_Description import Generation_VCF_header
 from math import log10
 import numpy as np
@@ -741,7 +741,16 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
 
 
-def load_valuable_chr(path):
+def load_valuable_chr(path: str) -> Dict[str, Union[List[str], Dict[str, List[str]]]]:
+    """Load a dictionary of signature types to list (or dict of lists) containing the chromosome
+    names with that type of signatures.
+
+    Args:
+        path (str): The temporary work path for the signature files
+
+    Returns:
+        Dict[str,Union[List[str],Dict[str,List[str]]]]: From signature type to list of chromosome names.
+    """
     valuable_chr = dict()
     valuable_chr["DEL"] = list()
     valuable_chr["DUP"] = list()

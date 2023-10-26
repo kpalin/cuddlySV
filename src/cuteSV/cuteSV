@@ -1,11 +1,4 @@
 #!/usr/bin/env python
-""" 
- * All rights Reserved, Designed By HIT-Bioinformatics   
- * @Title: cuteSV 
- * @author: tjiang & sqcao
- * @date: June 21st 2023
- * @version V2.1.0+dev
-"""
 
 from pathlib import Path
 import pysam

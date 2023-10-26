@@ -1,6 +1,7 @@
+from typing import Iterable
 from cuteSV.cuteSV_genotype import cal_CIPOS, overlap_cover, assign_gt
 from multiprocessing import Pool
-from pysam import VariantFile
+from pysam import VariantFile, VariantRecord
 import math
 import time
 import logging
@@ -537,13 +538,21 @@ def force_calling_chrom(
     logging.info("Enable to perform force calling.")
 
     # parse svs tobe genotyped
-    vcf_reader = VariantFile(ivcf_path, "r")
     svs_tobe_genotyped = dict()
-    for record in vcf_reader.fetch():
+
+    vcf_reader = VariantFile(ivcf_path, "r")
+    vcf_it: Iterable[VariantRecord] = vcf_reader.fetch()
+    for record in vcf_it:
         sv_type, chrom, sv_chr2, pos, sv_end, sv_strand, svid, ref, alts = parse_record(
             record
         )
         if sv_type not in ["DEL", "INS", "DUP", "INV", "TRA"]:
+            logging.info(
+                "Skipping %s for SVTYPE %s a.k.a. %s.",
+                record.id,
+                record.info.get("SVTYPE", "Undefined"),
+                sv_type,
+            )
             continue
         if chrom not in svs_tobe_genotyped:
             svs_tobe_genotyped[chrom] = list()

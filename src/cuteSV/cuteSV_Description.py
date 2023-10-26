@@ -1,13 +1,13 @@
-""" 
- * All rights Reserved, Designed By HIT-Bioinformatics   
- * @Title:  cuteSV_Description.py
- * @author: tjiang & sqcao
- * @date: May 12th 2023
- * @version V2.0.3
-"""
 import argparse
+import sys
 
-VERSION = "2.0.3"
+if sys.version_info >= (3, 8):
+    from importlib import metadata
+else:
+    import importlib_metadata as metadata
+
+
+VERSION = metadata.version("cuteSV")
 
 
 class cuteSVdp(object):
