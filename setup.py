@@ -26,7 +26,6 @@ setup(
         "Biopython",
         "Cigar",
         "numpy",
-        "pyvcf",
         'importlib-metadata >= 1.0 ; python_version < "3.8"',
     ],
 )
