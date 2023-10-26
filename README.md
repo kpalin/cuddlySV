@@ -138,7 +138,7 @@ Please cite the manuscript of cuteSV before using these callsets.
  1. Skip supplementary alignments mostly overlapping primary in opposite strand. In ONT data these
     are likely two strands of the same molecule sequenced in same read.
  2. Continue work from previously retained workdir.
- 3. Optionally add readgroup from alignment file to the read names.
+ 3. Add readgroup from alignment file to the read names.
 
  cuteSV (v2.0.3):
 

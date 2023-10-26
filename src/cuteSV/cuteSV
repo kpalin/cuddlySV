@@ -1267,8 +1267,13 @@ def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
 
 
 def process_alignments(args, temporary_dir, Task_list, bed_regions):
+    from pathlib import Path
+
+    signatures_path = Path(temporary_dir) / "signatures/"
+    logging.info("Signature path '%s'.", str(signatures_path))
+
     analysis_pools = Pool(processes=int(args.threads))
-    os.mkdir("%ssignatures" % temporary_dir)
+
     for i in range(len(Task_list)):
         para = [
             (
@@ -1328,7 +1333,7 @@ def setupLogging(debug=False):
     logLevel = logging.DEBUG if debug else logging.INFO
     logFormat = "%(asctime)s [%(levelname)s:%(process)d] %(message)s"
     logging.basicConfig(stream=sys.stderr, level=logLevel, format=logFormat)
-    logging.info("Running %s" % " ".join(sys.argv))
+    # logging.info("Running %s" % " ".join(sys.argv))
     logging.debug("Since debug is %s, using logLevel %s", str(debug), str(logLevel))
 
 
