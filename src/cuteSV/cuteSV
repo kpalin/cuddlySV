@@ -929,8 +929,6 @@ def single_pipe(
     bed_regions,
     verbose,
 ):
-    setupLogging(verbose)
-    logging.debug("Hello World! from task %s", str(task))
     candidate = list()
     reads_info_list = list()
     Chr_name = task[0]
@@ -1026,7 +1024,11 @@ def single_pipe(
 
 
 def multi_run_wrapper(args):
-    return single_pipe(*args)
+    setupLogging(True)
+    try:
+        return single_pipe(*args)
+    except Exception as e:
+        logging.exception("Exception while handing alignments!")
 
 
 def temp_dir_empty(temporary_dir: str) -> bool:
@@ -1267,8 +1269,14 @@ def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
 
 
 def process_alignments(args, temporary_dir, Task_list, bed_regions):
+    from pathlib import Path
+
+    signatures_path = Path(temporary_dir) / "signatures/"
+    signatures_path.mkdir(parents=True, exist_ok=True)
+    logging.info("Signature path '%s'.", str(signatures_path))
+
     analysis_pools = Pool(processes=int(args.threads))
-    os.mkdir("%ssignatures" % temporary_dir)
+
     for i in range(len(Task_list)):
         para = [
             (
@@ -1293,7 +1301,6 @@ def process_alignments(args, temporary_dir, Task_list, bed_regions):
 
 
 def merge_signatures(args, temporary_dir):
-    analysis_pools = Pool(processes=int(args.threads))
     cmd_del = (
         "cat %ssignatures/*.bed | grep -w DEL | sort -u -T %s | sort -k 2,2 -k 3,3n -T %s > %sDEL.sigs"
         % (temporary_dir, temporary_dir, temporary_dir, temporary_dir)
@@ -1318,6 +1325,8 @@ def merge_signatures(args, temporary_dir):
         temporary_dir,
         temporary_dir,
     )
+
+    analysis_pools = Pool(processes=int(args.threads))
     for i in [cmd_ins, cmd_del, cmd_dup, cmd_tra, cmd_inv, cmd_reads]:
         analysis_pools.map_async(exe, (i,))
     analysis_pools.close()
@@ -1328,7 +1337,7 @@ def setupLogging(debug=False):
     logLevel = logging.DEBUG if debug else logging.INFO
     logFormat = "%(asctime)s [%(levelname)s:%(process)d] %(message)s"
     logging.basicConfig(stream=sys.stderr, level=logLevel, format=logFormat)
-    logging.info("Running %s" % " ".join(sys.argv))
+    # logging.info("Running %s" % " ".join(sys.argv))
     logging.debug("Since debug is %s, using logLevel %s", str(debug), str(logLevel))
 
 

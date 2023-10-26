@@ -26,6 +26,7 @@ setup(
         "Biopython",
         "Cigar",
         "numpy",
+        "pyfastx",
         'importlib-metadata >= 1.0 ; python_version < "3.8"',
     ],
 )
