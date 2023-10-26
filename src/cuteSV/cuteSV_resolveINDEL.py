@@ -138,6 +138,8 @@ def generate_del_cluster(
     remain_reads_ratio,
 ):
     """
+    candidate_single_SV is the output argument where to put the clusters.
+
     generate deletion
     *************************************************************
     threshold_gloab 	threshold_local 	minimum_support_reads
@@ -224,7 +226,10 @@ def generate_del_cluster(
             # signalLen = np.mean(allele[1])
             signalLen_STD = np.std(allele[1])
             CILEN = cal_CIPOS(np.std(allele[1]), len(allele[1]))
-
+            # allele[0]: List[Position]
+            # allele[1]: List[Length]
+            # allele[2]:  ????
+            # allele[3]: List[ReadName]
             if action:
                 candidate_single_SV.append(
                     [
@@ -525,9 +530,9 @@ def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias, svtype):
         if seq[0] != chr:
             continue
         reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-        #reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
+        # reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
     readsfile.close()
-    
+
     svs_list = list()
     for item in candidate_single_SV:
         svs_list.append(

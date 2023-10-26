@@ -84,7 +84,8 @@ def cal_GL(DR: int, DV: int) -> Tuple[str, str, int, int]:
     )
 
 
-def cal_CIPOS(std, num):
+def cal_CIPOS(std: float, num: float) -> str:
+    "Return down truncated 95% confidence interval of mean around zero for std with num observations"
     pos = int(1.96 * std / num**0.5)
     return "-%d,%d" % (pos, pos)
 
@@ -228,7 +229,7 @@ def assign_gt(
         DR = 0
         for query in read_count:
             if query not in read_id_dict[sv_idx]:
-                DR += 1  # Read overalps breakpoint, but does not support the SV
+                DR += 1  # Read overlaps breakpoint, but does not support the SV
 
         DV = len(read_id_dict[sv_idx])
         GT, GL, GQ, QUAL = cal_GL(DR, DV)

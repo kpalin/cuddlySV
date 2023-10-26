@@ -1073,6 +1073,9 @@ def main_ctrl(args, argv):
 
     if args.Ivcf != None:
         # force calling
+        logging.warning(
+            "Force calling does something very different from denovo calling!"
+        )
         result = force_call_genotypes(args, temporary_dir)
 
     else:

@@ -41,10 +41,12 @@ def parse_to_int(sth):
 def parse_record(record):
     sv_type = parse_svtype(record.info["SVTYPE"])
     chrom1 = record.chrom
-    start = parse_to_int(record.pos)
+    start = record.pos
     chrom2 = ""
     svlen = 0
     end = 0  # len for indel, end for others
+    strand = "."
+
     if "SVLEN" in record.info:
         svlen = abs(parse_to_int(record.info["SVLEN"]))
     if "END" in record.info:
@@ -58,7 +60,7 @@ def parse_record(record):
     else:
         if start == end:
             end = start + svlen
-    if sv_type == "TRA":
+    if sv_type in ("TRA", "BND"):
         if "CHR2" in record.info:
             chrom2 = record.info["CHR2"]
         if "END" in record.info:
@@ -83,8 +85,7 @@ def parse_record(record):
                 end = int(tra_alt.split(":")[1])
         except:
             pass
-    strand = "."
-    if sv_type != "TRA":
+    else:
         chrom2 = record.chrom
         if "STRAND" in record.info:
             strand = record.info["STRAND"]
@@ -144,7 +145,7 @@ def parse_sigs_chrom(var_type, work_dir, chrom_list):
         for chrom in var_dict:
             var_dict[chrom].sort(key=lambda x: x[1])
         return var_dict
-    if var_type == "TRA":
+    if var_type in ("TRA", "BND"):
         var_dict = dict()  # var_dict[chrom1][chrom2] = [[chrom2, pos1, pos2, read_id]]
         with open(work_dir + "TRA.sigs", "r") as f:
             for line in f:
@@ -157,22 +158,7 @@ def parse_sigs_chrom(var_type, work_dir, chrom_list):
                 chrom2 = seq[4]
                 pos2 = int(seq[5])
                 read_id = seq[6]
-                """
-                if chrom1 in var_dict:
-                    if tra_type in var_dict[chrom1]:
-                        if chrom2 in var_dict[chrom1][tra_type]:
-                            var_dict[chrom1][tra_type][chrom2].append([chrom2, pos1, pos2, read_id])
-                        else:
-                            var_dict[chrom1][tra_type][chrom2] = [[chrom2, pos1, pos2, read_id]]
-                    else:
-                        var_dict[chrom1][tra_type] = dict()
-                        var_dict[chrom1][tra_type][chrom2] = [[chrom2, pos1, pos2, read_id]]
 
-                else:
-                    var_dict[chrom1] = dict()
-                    var_dict[chrom1][tra_type] = dict()
-                    var_dict[chrom1][tra_type][chrom2] = [[chrom2, pos1, pos2, read_id]]
-                """
                 if chrom1 not in var_dict:
                     var_dict[chrom1] = dict()
                 if chrom2 not in var_dict[chrom1]:
@@ -546,7 +532,7 @@ def force_calling_chrom(
         sv_type, chrom, sv_chr2, pos, sv_end, sv_strand, svid, ref, alts = parse_record(
             record
         )
-        if sv_type not in ["DEL", "INS", "DUP", "INV", "TRA"]:
+        if sv_type not in ["DEL", "INS", "DUP", "INV", "TRA", "BND"]:
             logging.info(
                 "Skipping %s for SVTYPE %s a.k.a. %s.",
                 record.id,
@@ -628,7 +614,7 @@ def solve_fc(
     readsfile.close()
 
     sv_dict = dict()
-    for sv_type in ["DEL", "DUP", "INS", "INV", "TRA"]:
+    for sv_type in ["DEL", "DUP", "INS", "INV", "TRA", "BND"]:
         sv_dict[sv_type] = parse_sigs_chrom(sv_type, temporary_dir, chrom_list)
 
     gt_list = list()
@@ -644,15 +630,20 @@ def solve_fc(
             sv_end = record[3]
             chrom = record[8]
             search_id_list = list()
+            sv_type_id_tra = sv_type in ("TRA", "BND")
             # rewrite!
             if (
-                sv_type == "TRA"
+                sv_type_id_tra
                 and "TRA" in sv_dict
                 and chrom in sv_dict["TRA"]
                 and sv_chr2 in sv_dict["TRA"][chrom]
             ):
                 search_id_list = sv_dict["TRA"][chrom][sv_chr2]
-            elif sv_type != "TRA" and sv_type in sv_dict and chrom in sv_dict[sv_type]:
+            elif (
+                (not sv_type_id_tra)
+                and sv_type in sv_dict
+                and chrom in sv_dict[sv_type]
+            ):
                 search_id_list = sv_dict[sv_type][chrom]
             max_cluster_bias = 0
             if sv_type == "INS" or sv_type == "DEL":
