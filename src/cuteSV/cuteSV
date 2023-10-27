@@ -4,7 +4,7 @@ from pathlib import Path
 import pysam
 import cigar
 import pyfastx
-from cuteSV.cuteSV_Description import parseArgs
+from cuteSV.cuteSV_Description import parseArgs, setupLogging
 from multiprocessing import Pool
 from cuteSV.CommandRunner import *
 
@@ -1029,6 +1029,15 @@ def multi_run_wrapper(args):
         return single_pipe(*args)
     except Exception as e:
         logging.exception("Exception while handing alignments!")
+        raise
+
+
+def error_handler(exc):
+    import traceback
+
+    traceback.print_exception(exc)
+    logging.exception("Exception while multiprocessing!")
+    raise exc
 
 
 def temp_dir_empty(temporary_dir: str) -> bool:
@@ -1124,7 +1133,9 @@ def main_ctrl(args, argv):
                     args.remain_reads_ratio,
                 )
             ]
-            result.append(analysis_pools.map_async(run_ins, para))
+            result.append(
+                analysis_pools.map_async(run_ins, para, error_callback=error_handler)
+            )
 
         # +++++INV+++++
         for chr in valuable_chr["INV"]:
@@ -1142,7 +1153,9 @@ def main_ctrl(args, argv):
                     args.gt_round,
                 )
             ]
-            result.append(analysis_pools.map_async(run_inv, para))
+            result.append(
+                analysis_pools.map_async(run_inv, para, error_callback=error_handler)
+            )
 
         # +++++DUP+++++
         for chr in valuable_chr["DUP"]:
@@ -1159,7 +1172,9 @@ def main_ctrl(args, argv):
                     args.gt_round,
                 )
             ]
-            result.append(analysis_pools.map_async(run_dup, para))
+            result.append(
+                analysis_pools.map_async(run_dup, para, error_callback=error_handler)
+            )
 
         # +++++TRA+++++
         for chr in valuable_chr["TRA"]:
@@ -1177,7 +1192,11 @@ def main_ctrl(args, argv):
                         args.gt_round,
                     )
                 ]
-                result.append(analysis_pools.map_async(run_tra, para))
+                result.append(
+                    analysis_pools.map_async(
+                        run_tra, para, error_callback=error_handler
+                    )
+                )
 
         analysis_pools.close()
         analysis_pools.join()
@@ -1295,7 +1314,7 @@ def process_alignments(args, temporary_dir, Task_list, bed_regions):
                 args.verbose,
             )
         ]
-        analysis_pools.map_async(multi_run_wrapper, para)
+        analysis_pools.map_async(multi_run_wrapper, para, error_callback=error_handler)
     analysis_pools.close()
     analysis_pools.join()
 
@@ -1331,14 +1350,6 @@ def merge_signatures(args, temporary_dir):
         analysis_pools.map_async(exe, (i,))
     analysis_pools.close()
     analysis_pools.join()
-
-
-def setupLogging(debug=False):
-    logLevel = logging.DEBUG if debug else logging.INFO
-    logFormat = "%(asctime)s [%(levelname)s:%(process)d] %(message)s"
-    logging.basicConfig(stream=sys.stderr, level=logLevel, format=logFormat)
-    # logging.info("Running %s" % " ".join(sys.argv))
-    logging.debug("Since debug is %s, using logLevel %s", str(debug), str(logLevel))
 
 
 def run(argv):

@@ -1,17 +1,11 @@
 import numpy as np
 import logging
-from cuteSV.cuteSV_genotype import overlap_cover, assign_gt
+from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt
 
-"""
-*******************************************
-                TO DO LIST
-*******************************************
-    1. Identify DP with samfile pointer;
-    2. Add CIPOS, CILEN and/or CIEND;
-    3. Determine (IM)PRECISE type.
-    4. Filter DUP to improve INS FN rate.
-*******************************************
-"""
+# TODO: 1. Identify DP with samfile pointer;
+# TODO: 2. Add CIPOS, CILEN and/or CIEND;
+# TODO: 3. Determine (IM)PRECISE type.
+# TODO: 4. Filter DUP to improve INS FN rate.
 
 
 def resolution_DUP(
@@ -146,9 +140,9 @@ def generate_dup_cluster(
                     [
                         chr,
                         "DUP",
-                        str(breakpoint_1),
-                        str(breakpoint_2 - breakpoint_1),
-                        str(len(support_read)),
+                        str(breakpoint_1),  # POS
+                        str(breakpoint_2 - breakpoint_1),  # SVLEN
+                        str(len(support_read)),  # RE?
                         ".",
                         "./.",
                         ".,.,.",

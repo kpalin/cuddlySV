@@ -1,18 +1,13 @@
 from collections import namedtuple
+from typing import List
 import numpy as np
-from cuteSV.cuteSV_genotype import cal_CIPOS, overlap_cover, assign_gt, ChrReadInfo
+from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt, ChrReadInfo
+from cuteSV.cuteSV_Description import setupLogging
 import logging
 
-"""
-*******************************************
-                TO DO LIST
-*******************************************
-    1. Identify DP with samfile pointer;
-    2. Add CIPOS, CILEN and/or CIEND;
-    3. Determine (IM)PRECISE type.
-*******************************************
-
-"""
+# TODO:1. Identify DP with samfile pointer;
+# TODO: 2. Add CIPOS, CILEN and/or CIEND;
+# TODO: 3. Determine (IM)PRECISE type.
 
 
 def resolution_DEL(
@@ -125,6 +120,15 @@ def resolution_DEL(
         return candidate_single_SV
 
 
+DelAlleleDesc = namedtuple(
+    "DelAlleleDesc", ("Positions", "Lengths", "Something", "ReadNames")
+)
+
+InsAlleleDesc = namedtuple(
+    "InsAlleleDesc", ("Positions", "Lengths", "Something", "ReadNames", "InsertSeq")
+)
+
+
 def generate_del_cluster(
     semi_del_cluster,
     chr,
@@ -167,7 +171,6 @@ def generate_del_cluster(
 
     last_len = read_tag2SortedList[0][1]
 
-    allele_collect = list()
     """
     *************************************************************
         #1 				#2			#3			#4
@@ -175,19 +178,21 @@ def generate_del_cluster(
         del-breakpoint	del-len		#support 	read-id
     *************************************************************
     """
+
+    allele_collect: List[DelAlleleDesc] = list()
     allele_collect.append(
-        [
+        DelAlleleDesc(
             [read_tag2SortedList[0][0]],
             [read_tag2SortedList[0][1]],
             [],
             [read_tag2SortedList[0][2]],
-        ]
+        )
     )
 
     for i in read_tag2SortedList[1:]:
         if i[1] - last_len > DISCRETE_THRESHOLD_LEN_CLUSTER_DEL_TEMP:
             allele_collect[-1][2].append(len(allele_collect[-1][0]))
-            allele_collect.append([[], [], [], []])
+            allele_collect.append(DelAlleleDesc([], [], [], []))
 
         allele_collect[-1][0].append(i[0])
         allele_collect[-1][1].append(i[1])
@@ -201,9 +206,10 @@ def generate_del_cluster(
             allele_list = list()
             var_list = list()
             remain_allele_num = max(int(remain_reads_ratio * allele[2][0]), 1)
-            pos_mean = np.mean(allele[0])
+            pos_median, CIPOS, n_pos = cal_CI(allele.Positions)
+
             for i in range(len(allele[0])):
-                var_list.append((abs(allele[0][i] - pos_mean), i))
+                var_list.append((abs(allele[0][i] - pos_median), i))
             var_list.sort(key=lambda x: x[0])
             for i in range(remain_allele_num):
                 allele_list.append(allele[0][var_list[i][1]])
@@ -220,12 +226,8 @@ def generate_del_cluster(
                 allele_list.append(allele[1][var_list[i][1]])
             signalLen = np.mean(allele_list)
 
-            # breakpointStart = np.mean(allele[0])
-            # search_threshold = np.min(allele[0])
-            CIPOS = cal_CIPOS(np.std(allele[0]), len(allele[0]))
-            # signalLen = np.mean(allele[1])
-            signalLen_STD = np.std(allele[1])
-            CILEN = cal_CIPOS(np.std(allele[1]), len(allele[1]))
+            signalLen, CILEN, n_pos = cal_CI(allele.Lengths)
+
             # allele[0]: List[Position]
             # allele[1]: List[Length]
             # allele[2]:  ????
@@ -241,7 +243,7 @@ def generate_del_cluster(
                         str(CIPOS),
                         str(CILEN),
                         int(search_threshold),
-                        allele[3],
+                        allele.ReadNames,
                     ]
                 )
             else:
@@ -259,7 +261,7 @@ def generate_del_cluster(
                         ".,.,.",
                         ".",
                         ".",
-                        str(",".join(allele[3])),
+                        str(",".join(allele.ReadNames)),
                     ]
                 )
 
@@ -417,21 +419,21 @@ def generate_ins_cluster(
     DISCRETE_THRESHOLD_LEN_CLUSTER_INS_TEMP = threshold_gloab * np.mean(global_len)
     last_len = read_tag2SortedList[0][1]
 
-    allele_collect = list()
+    allele_collect: List[InsAlleleDesc] = list()
     allele_collect.append(
-        [
+        InsAlleleDesc(
             [read_tag2SortedList[0][0]],
             [read_tag2SortedList[0][1]],
             [],
             [read_tag2SortedList[0][2]],
             [read_tag2SortedList[0][3]],
-        ]
+        )
     )
 
     for i in read_tag2SortedList[1:]:
         if i[1] - last_len > DISCRETE_THRESHOLD_LEN_CLUSTER_INS_TEMP:
             allele_collect[-1][2].append(len(allele_collect[-1][0]))
-            allele_collect.append([[], [], [], [], []])
+            allele_collect.append(InsAlleleDesc([], [], [], [], []))
 
         allele_collect[-1][0].append(i[0])
         allele_collect[-1][1].append(i[1])
@@ -446,7 +448,8 @@ def generate_ins_cluster(
             allele_list = list()
             var_list = list()
             remain_allele_num = max(int(remain_reads_ratio * allele[2][0]), 1)
-            pos_mean = np.mean(allele[0])
+            pos_mean, CIPOS, n_pos = cal_CI(allele.Positions)
+
             for i in range(len(allele[0])):
                 var_list.append((abs(allele[0][i] - pos_mean), i))
             var_list.sort(key=lambda x: x[0])
@@ -462,18 +465,15 @@ def generate_ins_cluster(
             var_list.sort(key=lambda x: x[0])
             for i in range(remain_allele_num):
                 allele_list.append(allele[1][var_list[i][1]])
-            signalLen = np.mean(allele_list)
 
-            # breakpointStart = np.mean(allele[0])
-            CIPOS = cal_CIPOS(np.std(allele[0]), len(allele[0]))
-            # signalLen = np.mean(allele[1])
-            signalLen_STD = np.std(allele[1])
-            CILEN = cal_CIPOS(np.std(allele[1]), len(allele[1]))
+            signalLen, CILEN, n_len = cal_CI(allele.Lengths)
             ideal_ins_seq = "<INS>"
-            for pos, i in zip(allele[0], allele[4]):
-                if len(i) >= int(signalLen):
+
+            # TODO: Figure out a way to get the consensus sequence insert. This is just randome one.
+            for pos, ins_seq in zip(allele.Positions, allele.InsertSeq):
+                if len(ins_seq) >= int(signalLen):
                     breakpointStart = pos
-                    ideal_ins_seq = i[0 : int(signalLen)]
+                    ideal_ins_seq = ins_seq[0 : int(signalLen)]
                     break
             if ideal_ins_seq == "<INS>":
                 continue
@@ -489,7 +489,7 @@ def generate_ins_cluster(
                         str(CIPOS),
                         str(CILEN),
                         int(breakpointStart),
-                        allele[3],
+                        allele.ReadNames,
                         ideal_ins_seq,
                     ]
                 )
@@ -508,18 +508,26 @@ def generate_ins_cluster(
                         ".,.,.",
                         ".",
                         ".",
-                        str(",".join(allele[3])),
+                        str(",".join(allele.ReadNames)),
                         ideal_ins_seq,
                     ]
                 )
 
 
 def run_del(args):
-    return resolution_DEL(*args)
+    setupLogging()
+    try:
+        return resolution_DEL(*args)
+    except Exception:
+        logging.exception("Error clustering DEL: %s", str(args))
 
 
 def run_ins(args):
-    return resolution_INS(*args)
+    setupLogging()
+    try:
+        return resolution_INS(*args)
+    except Exception:
+        logging.exception("Error clustering INS: %s", str(args))
 
 
 def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias, svtype):

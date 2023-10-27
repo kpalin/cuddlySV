@@ -1,5 +1,5 @@
 from typing import Iterable
-from cuteSV.cuteSV_genotype import cal_CIPOS, overlap_cover, assign_gt
+from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt
 from multiprocessing import Pool
 from pysam import VariantFile, VariantRecord
 import math
@@ -413,8 +413,8 @@ def find_in_indel_list(var_type, var_list, bias_origin, pos, sv_end, threshold_g
                 search_threshold = 0
             else:
                 read_id_set = set(final_alleles[3])
-                CIPOS = cal_CIPOS(np.std(final_alleles[0]), len(final_alleles[0]))
-                CILEN = cal_CIPOS(np.std(final_alleles[1]), len(final_alleles[1]))
+                _, CIPOS, n_pos = cal_CI(final_alleles[0])
+                _, CILEN, n_len = cal_CI(final_alleles[1])
                 seq = "<DEL>"
                 search_start = min(final_alleles[0])
                 search_end = max(final_alleles[0])
@@ -483,8 +483,8 @@ def find_in_indel_list(var_type, var_list, bias_origin, pos, sv_end, threshold_g
                 search_threshold = 0
             else:
                 read_id_set = set(final_alleles[3])
-                CIPOS = cal_CIPOS(np.std(final_alleles[0]), len(final_alleles[0]))
-                CILEN = cal_CIPOS(np.std(final_alleles[1]), len(final_alleles[1]))
+                _, CIPOS, n_pos = cal_CI(final_alleles[0])
+                _, CILEN, n_len = cal_CI(final_alleles[1])
                 seq = "<DEL>"
                 search_start = min(final_alleles[0])
                 search_end = max(final_alleles[0])

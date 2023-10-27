@@ -90,6 +90,22 @@ def cal_CIPOS(std: float, num: float) -> str:
     return "-%d,%d" % (pos, pos)
 
 
+def cal_CI(values: List[int]) -> Tuple[int, str, int]:
+    """Calculate median, span and number of unique values of the input.
+
+    Args:
+        values (List[int]): Positions or lengths of the data
+
+    Returns:
+        Tuple[int,str,int]: Rounded median and string -min offset,max offset
+    """
+    values = np.array(values)
+    median = int(np.median(values))
+    min_v = (values - median).min()
+    max_v = (values - median).max()
+    return median, "%d,%d" % (min_v, max_v), len(np.unique(values))
+
+
 def threshold_ref_count(num):
     if num <= 2:
         return 20 * num
@@ -369,7 +385,7 @@ def output_BND(args, ref_g, svid, file, action, variant):
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=variant[0],
             POS=str(int(variant[2]) + 1),
-            ID="cuteSV.%s.%d" % ("BND", svid["BND"]),
+            ID="cuddlySV.%s.%d" % ("BND", svid["BND"]),
             REF=reff,
             ALT=variant[1],
             INFO=info_list,
@@ -412,7 +428,7 @@ def output_INV(args, ref_g, svid, file, action, variant):
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=variant[0],
             POS=str(int(variant[2]) + 1),
-            ID="cuteSV.%s.%d" % (variant[1], svid[variant[1]]),
+            ID="cuddlySV.%s.%d" % (variant[1], svid[variant[1]]),
             REF=str(ref_g[variant[0]][int(variant[2])]),
             ALT="<%s>" % (variant[1]),
             INFO=info_list,
@@ -454,7 +470,7 @@ def output_DUP(args, ref_g, svid, file, action, variant):
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=variant[0],
             POS=str(int(variant[2]) + 1),
-            ID="cuteSV.%s.%d" % (variant[1], svid[variant[1]]),
+            ID="cuddlySV.%s.%d" % (variant[1], svid[variant[1]]),
             REF=str(ref_g[variant[0]][int(variant[2])]),
             ALT="<%s>" % (variant[1]),
             INFO=info_list,
@@ -517,7 +533,7 @@ def output_INS_DEL(args, ref_g, svid, file, action, i):
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=i[0],
             POS=str(int(i[2])),
-            ID="cuteSV.%s.%d" % (i[1], svid[i[1]]),
+            ID="cuddlySV.%s.%d" % (i[1], svid[i[1]]),
             REF=REF,
             ALT=ALT,
             INFO=info_list,

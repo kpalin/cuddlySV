@@ -15,7 +15,7 @@ setup(
     license="MIT",
     packages=["cuteSV"],
     package_dir={"": "src/"},
-    data_files=[("", ["LICENSE"])],
+    package_data={"": ["LICENSE"]},
     scripts=["src/cuteSV/cuteSV"],
     # long_description = LONG_DESCRIPTION,
     long_description=readme,

@@ -1,5 +1,6 @@
 import argparse
 import sys
+import logging
 
 if sys.version_info >= (3, 8):
     from importlib import metadata
@@ -373,10 +374,10 @@ def Generation_VCF_header(file, contiginfo, sample, argv):
         '##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n'
     )
     file.write(
-        '##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">\n'
+        '##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Min,Max interval around POS for imprecise variants">\n'
     )
     file.write(
-        '##INFO=<ID=CILEN,Number=2,Type=Integer,Description="Confidence interval around inserted/deleted material between breakends">\n'
+        '##INFO=<ID=CILEN,Number=2,Type=Integer,Description="Min,Max interval around inserted/deleted material between breakends">\n'
     )
     # file.write("##INFO=<ID=MATEID,Number=.,Type=String,Description=\"ID of mate breakends\">\n")
     file.write(
@@ -407,3 +408,11 @@ def Generation_VCF_header(file, contiginfo, sample, argv):
     )
 
     file.write('##CommandLine="cuteSV %s"\n' % (" ".join(argv)))
+
+
+def setupLogging(debug=False):
+    logLevel = logging.DEBUG if debug else logging.INFO
+    logFormat = "%(asctime)s [%(levelname)s:%(process)d] %(message)s"
+    logging.basicConfig(stream=sys.stderr, level=logLevel, format=logFormat)
+    # logging.info("Running %s" % " ".join(sys.argv))
+    logging.debug("Since debug is %s, using logLevel %s", str(debug), str(logLevel))
