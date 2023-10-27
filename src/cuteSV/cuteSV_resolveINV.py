@@ -115,7 +115,7 @@ def resolution_INV(
             )
     file.close()
     if action:
-        candidate_single_SV_gt = call_gt(
+        candidate_single_SV_gt = call_gt_inv(
             path, chr, candidate_single_SV, max_cluster_bias
         )
         logging.info("Finished %s:%s." % (chr, "INV"))
@@ -259,7 +259,7 @@ def run_inv(args):
     return resolution_INV(*args)
 
 
-def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
+def call_gt_inv(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
     reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
     readsfile = open("%sreads.sigs" % (temporary_dir), "r")
     for line in readsfile:
