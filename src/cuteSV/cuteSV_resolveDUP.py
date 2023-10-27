@@ -1,3 +1,6 @@
+from ast import Tuple
+from collections import namedtuple
+from typing import List
 import numpy as np
 import logging
 from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt
@@ -21,7 +24,7 @@ def resolution_DUP(
 ):
     semi_dup_cluster = list()
     semi_dup_cluster.append([0, 0, ""])
-    candidate_single_SV = list()
+    candidate_single_SV: List[Tuple] = list()
 
     file = open("%s%s.sigs" % (path, "DUP"), "r")
     for line in file:
@@ -76,7 +79,7 @@ def resolution_DUP(
             )
     file.close()
     if action:
-        candidate_single_SV_gt = call_gt(
+        candidate_single_SV_gt = call_gt_dup(
             path, chr, candidate_single_SV, max_cluster_bias
         )
         logging.info("Finished %s:%s." % (chr, "DUP"))
@@ -86,13 +89,31 @@ def resolution_DUP(
         return candidate_single_SV
 
 
+DuplicationSV = namedtuple(
+    "DuplicationSV",
+    (
+        "chrom",
+        "sv_type",
+        "pos",
+        "svlen",
+        "RE",
+        "DR",  # 5
+        "GT",
+        "PL",  # 7
+        "GQ",
+        "QUAL",  # 9
+        "ReadNames",
+    ),
+)
+
+
 def generate_dup_cluster(
     semi_dup_cluster,
     chr,
     read_count,
     max_cluster_bias,
     sv_size,
-    candidate_single_SV,
+    candidate_single_SV: List[DuplicationSV],
     action,
     MaxSize,
     gt_round,
@@ -122,6 +143,7 @@ def generate_dup_cluster(
             breakpoint_1 = i[low_b][0]
             breakpoint_2 = i[low_b][1]
         else:
+            # TODO: Figure out proper breakpoints. Not just means of breakpoints.
             breakpoint_1 = [i[0] for i in i[low_b:up_b]]
             breakpoint_2 = [i[1] for i in i[low_b:up_b]]
             breakpoint_1 = int(sum(breakpoint_1) / len(i[low_b:up_b]))
@@ -137,7 +159,7 @@ def generate_dup_cluster(
                 # print("DUP", chr, int(breakpoint_1), int(breakpoint_2), DR, DV, QUAL, "%.4f"%cost_time)
             else:
                 candidate_single_SV.append(
-                    [
+                    DuplicationSV(
                         chr,
                         "DUP",
                         str(breakpoint_1),  # POS
@@ -149,7 +171,7 @@ def generate_dup_cluster(
                         ".",
                         ".",
                         str(",".join(support_read)),
-                    ]
+                    )
                 )
 
 
@@ -157,7 +179,9 @@ def run_dup(args):
     return resolution_DUP(*args)
 
 
-def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
+def call_gt_dup(
+    temporary_dir, chr, candidate_single_SV: List[DuplicationSV], max_cluster_bias
+):
     reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
     readsfile = open("%sreads.sigs" % (temporary_dir), "r")
     for line in readsfile:
@@ -198,7 +222,7 @@ def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
     candidate_single_SV_gt = list()
     for i in range(len(candidate_single_SV)):
         candidate_single_SV_gt.append(
-            [
+            DuplicationSV(
                 candidate_single_SV[i][0],
                 candidate_single_SV[i][1],
                 str(candidate_single_SV[i][2]),
@@ -210,6 +234,6 @@ def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
                 str(assign_list[i][4]),
                 str(assign_list[i][5]),
                 ",".join(candidate_single_SV[i][4]),
-            ]
+            )
         )
     return candidate_single_SV_gt

@@ -220,12 +220,15 @@ def overlap_cover(
     return iteration_dict, primary_num_dict, cover2_dict
 
 
+GTassignment = namedtuple("GTassignment", ("DV", "DR", "GT", "GL", "GQ", "QUAL"))
+
+
 def assign_gt(
     iteration_dict: Dict[int, int],
     primary_num_dict: Dict[int, int],
     cover_dict: Dict[int, str],
     read_id_dict: Dict[int, str],
-) -> List[Tuple[int, int, int, int, int, int]]:
+) -> List[GTassignment]:
     """Assign genotype and calculate some format values for VCF output
 
     Args:
@@ -235,9 +238,9 @@ def assign_gt(
         read_id_dict (Dict[int, str]): _description_
 
     Returns:
-        List[Tuple[int,int,int,int,int,int]]: (DV, DR, GT, GL,GQ, QUAL)
+        List[GTassignment]: (DV, DR, GT, GL,GQ, QUAL)
     """
-    assign_list = list()
+    assign_list: List[GTassignment] = list()
     for sv_idx in read_id_dict:
         iteration = iteration_dict[sv_idx]
         primary_num = primary_num_dict[sv_idx]
@@ -249,7 +252,7 @@ def assign_gt(
 
         DV = len(read_id_dict[sv_idx])
         GT, GL, GQ, QUAL = cal_GL(DR, DV)
-        assign_list.append((DV, DR, GT, GL, GQ, QUAL))
+        assign_list.append(GTassignment(DV, DR, GT, GL, GQ, QUAL))
     return assign_list
 
 
@@ -299,7 +302,7 @@ def duipai(svs_list, reads_list, iteration_dict, primary_num_dict, cover2_dict):
     print("Correct iteration %d" % (correct_num))
 
 
-def generate_output(args, semi_result, contigINFO, argv, ref_g):
+def generate_output(args, semi_result: List[Tuple], contigINFO, argv, ref_g):
     """
     Generation of VCF format file.
     VCF version: 4.2
@@ -445,7 +448,10 @@ def output_INV(args, ref_g, svid, file, action, variant):
     svid[variant[1]] += 1
 
 
-def output_DUP(args, ref_g, svid, file, action, variant):
+from cuteSV.cuteSV_resolveDUP import DuplicationSV
+
+
+def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):
     cal_end = int(variant[2]) + 1 + abs(int(float(variant[3])))
     info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND=-+;RNAMES={RNAMES}".format(
         PRECISION="IMPRECISE" if variant[6] == "0/0" else "PRECISE",

@@ -1215,7 +1215,7 @@ def main_ctrl(args, argv):
             try:
                 semi_result += res.get()[0]
             except:
-                pass
+                raise
         # sort SVs by [chr] and [pos]
         semi_result = sorted(semi_result, key=lambda x: (x[0], int(x[2])))
         logging.info("Loading reference genome...")
