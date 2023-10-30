@@ -122,6 +122,11 @@ def parseArgs(argv):
         action="store_true",
     )
     parser.add_argument(
+        "--report_readgroup",
+        help="Enable to report supporting readgroup ids for each SV. Only usefull with report_readid.",
+        action="store_true",
+    )
+    parser.add_argument(
         "--max_ref_allele",
         help="Maximum length of reported reference allele for deletions. Longer variants use ALT allele <DEL>.[%(default)s]",
         default=100,

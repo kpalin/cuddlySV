@@ -302,6 +302,11 @@ def duipai(svs_list, reads_list, iteration_dict, primary_num_dict, cover2_dict):
     print("Correct iteration %d" % (correct_num))
 
 
+def strip_rnames(rnames: str) -> str:
+    "Strip the post ':' annotation from read names"
+    return ",".join(rname.split(":")[0] for rname in rnames.split(","))
+
+
 def generate_output(args, semi_result: List[Tuple], contigINFO, argv, ref_g):
     """
     Generation of VCF format file.
@@ -361,13 +366,18 @@ def generate_output(args, semi_result: List[Tuple], contigINFO, argv, ref_g):
 
 
 def output_BND(args, ref_g, svid, file, action, variant):
+    rnames = "NULL"
+    if args.report_readid:
+        rnames = variant[11]
+    if not args.report_readgroup:
+        rnames = strip_rnames(rnames)
     info_list = "{PRECISION};SVTYPE={SVTYPE};RE={RE};RNAMES={RNAMES}".format(
         PRECISION="IMPRECISE" if variant[7] == "0/0" else "PRECISE",
         SVTYPE="BND",
         # CHR2 = i[3],
         # END = str(int(i[4]) + 1),
         RE=variant[5],
-        RNAMES=variant[11] if args.report_readid else "NULL",
+        RNAMES=rnames,
     )
     if action:
         try:
@@ -406,6 +416,11 @@ def output_BND(args, ref_g, svid, file, action, variant):
 
 
 def output_INV(args, ref_g, svid, file, action, variant):
+    rnames = "NULL"
+    if args.report_readid:
+        rnames = variant[11]
+    if not args.report_readgroup:
+        rnames = strip_rnames(rnames)
     cal_end = int(variant[2]) + 1 + abs(int(float(variant[3])))
     info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND={STRAND};RNAMES={RNAMES}".format(
         PRECISION="IMPRECISE" if variant[6] == "0/0" else "PRECISE",
@@ -414,7 +429,7 @@ def output_INV(args, ref_g, svid, file, action, variant):
         END=str(cal_end),
         RE=variant[4],
         STRAND=variant[7],
-        RNAMES=variant[11] if args.report_readid else "NULL",
+        RNAMES=rnames,
     )
     if action:
         try:
@@ -452,6 +467,11 @@ from cuteSV.cuteSV_resolveDUP import DuplicationSV
 
 
 def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):
+    rnames = "NULL"
+    if args.report_readid:
+        rnames = variant[10]
+    if not args.report_readgroup:
+        rnames = strip_rnames(rnames)
     cal_end = int(variant[2]) + 1 + abs(int(float(variant[3])))
     info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};RE={RE};STRAND=-+;RNAMES={RNAMES}".format(
         PRECISION="IMPRECISE" if variant[6] == "0/0" else "PRECISE",
@@ -459,7 +479,7 @@ def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):
         SVLEN=variant[3],
         END=str(cal_end),
         RE=variant[4],
-        RNAMES=variant[10] if args.report_readid else "NULL",
+        RNAMES=rnames,
     )
     if action:
         try:
@@ -493,67 +513,79 @@ def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):
     svid[variant[1]] += 1
 
 
-def output_INS_DEL(args, ref_g, svid, file, action, i):
-    if i[1] == "INS":
-        cal_end = int(i[2])
+def output_INS_DEL(args, ref_g, svid, file, action, variant):
+    if variant[1] == "INS":
+        cal_end = int(variant[2])
     else:
-        cal_end = int(i[2]) + abs(int(float(i[3])))
+        cal_end = int(variant[2]) + abs(int(float(variant[3])))
+
+    rnames = "NULL"
+    if args.report_readid:
+        rnames = variant[12]
+    if not args.report_readgroup:
+        rnames = strip_rnames(rnames)
     info_list = "{PRECISION};SVTYPE={SVTYPE};SVLEN={SVLEN};END={END};CIPOS={CIPOS};CILEN={CILEN};RE={RE};RNAMES={RNAMES}".format(
-        PRECISION="IMPRECISE" if i[8] == "0/0" else "PRECISE",
-        SVTYPE=i[1],
-        SVLEN=i[3],
+        PRECISION="IMPRECISE" if variant[8] == "0/0" else "PRECISE",
+        SVTYPE=variant[1],
+        SVLEN=variant[3],
         END=str(cal_end),
-        CIPOS=i[5],
-        CILEN=i[6],
-        RE=i[4],
-        RNAMES=i[12] if args.report_readid else "NULL",
+        CIPOS=variant[5],
+        CILEN=variant[6],
+        RE=variant[4],
+        RNAMES=rnames,
     )
     if action:
         try:
-            info_list += ";AF=" + str(round(int(i[4]) / (int(i[4]) + int(i[7])), 4))
+            info_list += ";AF=" + str(
+                round(int(variant[4]) / (int(variant[4]) + int(variant[7])), 4)
+            )
         except:
             info_list += ";AF=."
-    if i[1] == "DEL":
+    if variant[1] == "DEL":
         info_list += ";STRAND=+-"
-    if i[11] == "." or i[11] == None:
+    if variant[11] == "." or variant[11] == None:
         filter_lable = "PASS"
     else:
-        filter_lable = "PASS" if float(i[11]) >= 5.0 else "q5"
+        filter_lable = "PASS" if float(variant[11]) >= 5.0 else "q5"
 
     # Infer alleles
-    if i[1] == "INS":
-        REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
-        ALT = str(ref_g[i[0]][max(int(i[2]) - 1, 0)]) + i[13]
-    elif i[1] == "DEL":
-        if abs(float(i[3])) <= (args.max_ref_allele):
-            REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0) : int(i[2]) - int(i[3])])
-            ALT = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+    if variant[1] == "INS":
+        REF = str(ref_g[variant[0]][max(int(variant[2]) - 1, 0)])
+        ALT = str(ref_g[variant[0]][max(int(variant[2]) - 1, 0)]) + variant[13]
+    elif variant[1] == "DEL":
+        if abs(float(variant[3])) <= (args.max_ref_allele):
+            REF = str(
+                ref_g[variant[0]][
+                    max(int(variant[2]) - 1, 0) : int(variant[2]) - int(variant[3])
+                ]
+            )
+            ALT = str(ref_g[variant[0]][max(int(variant[2]) - 1, 0)])
         else:
-            # logging.debug("Not reporting long reference allele for %s", str(i[:4]))
-            REF = str(ref_g[i[0]][max(int(i[2]) - 1, 0)])
+            # logging.debug("Not reporting long reference allele for %s", str(variant[:4]))
+            REF = str(ref_g[variant[0]][max(int(variant[2]) - 1, 0)])
             ALT = "<DEL>"
     else:
-        raise ValueError(args=i)
+        raise ValueError(args=variant)
 
     file.write(
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
-            CHR=i[0],
-            POS=str(int(i[2])),
-            ID="cuddlySV.%s.%d" % (i[1], svid[i[1]]),
+            CHR=variant[0],
+            POS=str(int(variant[2])),
+            ID="cuddlySV.%s.%d" % (variant[1], svid[variant[1]]),
             REF=REF,
             ALT=ALT,
             INFO=info_list,
             FORMAT="GT:DR:DV:PL:GQ",
-            GT=i[8],
-            DR=i[7],
-            RE=i[4],
-            PL=i[9],
-            GQ=i[10],
-            QUAL=i[11],
+            GT=variant[8],
+            DR=variant[7],
+            RE=variant[4],
+            PL=variant[9],
+            GQ=variant[10],
+            QUAL=variant[11],
             PASS=filter_lable,
         )
     )
-    svid[i[1]] += 1
+    svid[variant[1]] += 1
 
 
 def generate_pvcf(args, result, contigINFO, argv, ref_g):
@@ -700,7 +732,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
                 SVLEN=i[4] - i[1],
                 END=i[4],
                 RE=i[7][0],
-                RNAMES=i[8] if args.report_readid else "NULL",
+                RNAMES=(i[8]) if args.report_readid else "NULL",
             )
             if i[12] != ".":
                 info_list += ";STRAND=" + i[12]

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+from typing import Any
 import pysam
 import cigar
 import pyfastx
@@ -39,8 +40,12 @@ def get_cigar_ref_length(cigar: str) -> int:
     return consumed_ref
 
 
-def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.9) -> bool:
-    "Check if the aligned_segment is false 1d2 read, i.e. aligned in two parts, overlapping, in opposite strands"
+def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.95) -> bool:
+    """Check if the aligned_segment is false 1d2 read, i.e. aligned in two parts, overlapping, in
+    opposite strands.
+
+    Return True, if aligned_segment has supplementary alignment which is shorter, opposite strand
+    and overlapping for over overlap_threshold"""
     # Extract the reference name, start, and end coordinates of the aligned segment
     ref_name = aligned_segment.reference_name
     start = aligned_segment.reference_start
@@ -50,8 +55,6 @@ def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.9) ->
     try:
         sa_tag = aligned_segment.get_tag("SA").rstrip(";").split(";")
     except KeyError:
-        return False
-    if len(sa_tag) != 1:
         return False
 
     # Check for each supplementary alignment if it overlaps with the aligned segment
@@ -72,6 +75,10 @@ def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.9) ->
 
         sa_ref_len = get_cigar_ref_length(sa_cigar)
         sa_end = sa_start + sa_ref_len
+
+        if aligned_segment.reference_length > sa_ref_len:
+            # The supplementary alignment is shorter
+            continue
 
         # Calculate the length of the overlap
         overlap_length = min(end, sa_end) - max(start, sa_start)
@@ -200,6 +207,7 @@ def analysis_bnd(ele_1, ele_2, read_name, candidate):
                     # N[chr:pos[
 
 
+# TODO:  This function has a bug. Read aligned in 3 parts, large deletion followed by false inversion is not classified as deletion signal.
 def analysis_split_read(
     split_read, SV_size, RLength, read_name, candidate, MaxSize, query
 ):
@@ -763,7 +771,7 @@ def generate_combine_sigs(sigs, Chr_name, read_name, svtype, candidate, merge_di
 
 
 def parse_read(
-    read: pysam.AlignedSegment,
+    aligned: pysam.AlignedSegment,
     Chr_name,
     SV_size,
     min_mapq,
@@ -774,22 +782,22 @@ def parse_read(
     merge_ins_threshold,
     MaxSize,
 ):
-    if read.query_length < min_read_len:
+    if aligned.query_length < min_read_len:
         return []
-    is_1d2_chimera = is_1d2_read(read)
+    is_1d2_chimera = is_1d2_read(aligned)
 
-    if is_1d2_chimera and read.is_supplementary:
-        # Only use the primary AlignedSegment for 1d2 chimera reads.
-        # logging.debug("Skipping %s",(read.query_name))
+    if is_1d2_chimera:
         return []
     candidate = list()
     Combine_sig_in_same_read_ins = list()
     Combine_sig_in_same_read_del = list()
     from pysam import CSOFT_CLIP, CHARD_CLIP, CMATCH, CINS, CDEL, CEQUAL, CDIFF
 
-    if read.mapq >= min_mapq:
-        pos_start = read.reference_start  # 0-based
-        pos_end = read.reference_end
+    if aligned.query_name == "6cc3cf72-3142-4584-a60b-27a425e39665":
+        logging.info("Using read %s", aligned.query_name)
+    if aligned.mapq >= min_mapq:
+        pos_start = aligned.reference_start  # 0-based
+        pos_end = aligned.reference_end
         shift_del = 0
         shift_ins = 0
         softclip_left = 0
@@ -797,12 +805,12 @@ def parse_read(
         hardclip_left = 0
         hardclip_right = 0
         shift_ins_read = 0
-        if read.cigar[0][0] == CSOFT_CLIP:
-            softclip_left = read.cigar[0][1]
-        if read.cigar[0][0] == CHARD_CLIP:
-            hardclip_left = read.cigar[0][1]
+        if aligned.cigar[0][0] == CSOFT_CLIP:
+            softclip_left = aligned.cigar[0][1]
+        if aligned.cigar[0][0] == CHARD_CLIP:
+            hardclip_left = aligned.cigar[0][1]
 
-        for element in read.cigar:
+        for element in aligned.cigar:
             if element[0] in [CMATCH, CEQUAL, CDIFF]:
                 shift_del += element[1]
             if (
@@ -829,7 +837,7 @@ def parse_read(
                         pos_start + shift_ins,
                         element[1],
                         str(
-                            read.query_sequence[
+                            aligned.query_sequence[
                                 shift_ins_read
                                 - element[1]
                                 - hardclip_left : shift_ins_read
@@ -839,10 +847,10 @@ def parse_read(
                     ]
                 )
 
-        if read.cigar[-1][0] == CSOFT_CLIP:
-            softclip_right = read.cigar[-1][1]
-        if read.cigar[-1][0] == CHARD_CLIP:
-            hardclip_right = read.cigar[-1][1]
+        if aligned.cigar[-1][0] == CSOFT_CLIP:
+            softclip_right = aligned.cigar[-1][1]
+        if aligned.cigar[-1][0] == CHARD_CLIP:
+            hardclip_right = aligned.cigar[-1][1]
 
         if hardclip_left != 0:
             softclip_left = hardclip_left
@@ -853,7 +861,7 @@ def parse_read(
     generate_combine_sigs(
         Combine_sig_in_same_read_ins,
         Chr_name,
-        get_query_name(read),
+        get_query_name(aligned),
         "INS",
         candidate,
         merge_ins_threshold,
@@ -861,19 +869,19 @@ def parse_read(
     generate_combine_sigs(
         Combine_sig_in_same_read_del,
         Chr_name,
-        get_query_name(read),
+        get_query_name(aligned),
         "DEL",
         candidate,
         merge_del_threshold,
     )
 
-    if read.flag == 0 or read.flag == pysam.FREVERSE:
-        # Exclude duplicate, supplemetary, secondary, qcfail, paired etc. reads.
-        if read.mapq >= min_mapq:
-            if not read.is_reverse:
+    if aligned.flag == 0 or aligned.flag == pysam.FREVERSE:
+        # Exclude duplicate, supplementary, secondary, qcfail, paired etc. reads.
+        if aligned.mapq >= min_mapq:
+            if not aligned.is_reverse:
                 primary_info = [
                     softclip_left,
-                    read.query_length - softclip_right,
+                    aligned.query_length - softclip_right,
                     pos_start,
                     pos_end,
                     Chr_name,
@@ -882,7 +890,7 @@ def parse_read(
             else:
                 primary_info = [
                     softclip_right,
-                    read.query_length - softclip_left,
+                    aligned.query_length - softclip_left,
                     pos_start,
                     pos_end,
                     Chr_name,
@@ -894,7 +902,7 @@ def parse_read(
         if not is_1d2_chimera:
             # Ignore the false chimeric alignment for the false 1d2 reads
             try:
-                SAtag = read.get_tag("SA")
+                SAtag = aligned.get_tag("SA")
             except KeyError:
                 SAtag = None
             if not SAtag is None:
@@ -902,14 +910,14 @@ def parse_read(
                 organize_split_signal(
                     primary_info,
                     Supplementary_info,
-                    read.query_length,
+                    aligned.query_length,
                     SV_size,
                     min_mapq,
                     max_split_parts,
-                    get_query_name(read),
+                    get_query_name(aligned),
                     candidate,
                     MaxSize,
-                    read.query_sequence,
+                    aligned.query_sequence,
                 )
     return candidate
 
@@ -1204,9 +1212,25 @@ def main_ctrl(args, argv):
 
     logging.info("Writing to your output file.")
 
+    logging.info("Loading reference genome...")
+    from functools import lru_cache
+
+    class CacheFasta:
+        def __init__(self, fasta_name):
+            self.__fasta = pyfastx.Fasta(fasta_name)
+
+        @lru_cache(maxsize=1)
+        def __getitem__(self, _x):
+            return self.__fasta[_x]
+
+        def __getattr__(self, __name: str) -> Any:
+            return self.__fasta.__getattr__(__name)
+
+    ref_g = CacheFasta(args.reference)
+    # ref_g = pyfastx.Fasta(args.reference)
+
     if args.Ivcf != None:
         result = sorted(result, key=lambda x: (x[0], x[1]))
-        ref_g = pyfastx.Fasta(args.reference)
         generate_pvcf(args, result, contigINFO, argv, ref_g)
 
     else:
@@ -1218,8 +1242,7 @@ def main_ctrl(args, argv):
                 raise
         # sort SVs by [chr] and [pos]
         semi_result = sorted(semi_result, key=lambda x: (x[0], int(x[2])))
-        logging.info("Loading reference genome...")
-        ref_g = pyfastx.Fasta(args.reference)
+
         logging.info("Writing output...")
         generate_output(args, semi_result, contigINFO, argv, ref_g)
 
