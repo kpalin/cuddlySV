@@ -674,7 +674,7 @@ def organize_split_signal(
 ):
     split_read = list()
     if len(primary_info) > 0:
-        split_read.append(primary_info)
+        split_read.append(list(primary_info))
         min_mapq = 0
     for i in Supplementary_info:
         seq = i.split(",")

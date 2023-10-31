@@ -73,82 +73,180 @@ def analysis_bnd(ele_1, ele_2, read_name, candidate):
     *	TYPE D:		]chr:pos]N	*
     *****************************
     """
-    if ele_2[0] - ele_1[1] <= 100:
-        if ele_1[5] == "+":
-            if ele_2[5] == "+":
+    if ele_2.read_start - ele_1.read_end <= 100:
+        if ele_1.strand == "+":
+            if ele_2.strand == "+":
                 # +&+
-                if ele_1[4] < ele_2[4]:
+                if ele_1.chrom < ele_2.chrom:
                     candidate.append(
-                        ["A", ele_1[3], ele_2[4], ele_2[2], read_name, "TRA", ele_1[4]]
+                        [
+                            "A",
+                            ele_1.ref_end,
+                            ele_2.chrom,
+                            ele_2.ref_start,
+                            read_name,
+                            "TRA",
+                            ele_1.chrom,
+                        ]
                     )
                     # N[chr:pos[
                 else:
                     candidate.append(
-                        ["D", ele_2[2], ele_1[4], ele_1[3], read_name, "TRA", ele_2[4]]
+                        [
+                            "D",
+                            ele_2.ref_start,
+                            ele_1.chrom,
+                            ele_1.ref_end,
+                            read_name,
+                            "TRA",
+                            ele_2.chrom,
+                        ]
                     )
                     # ]chr:pos]N
             else:
                 # +&-
-                if ele_1[4] < ele_2[4]:
+                if ele_1.chrom < ele_2.chrom:
                     candidate.append(
-                        ["B", ele_1[3], ele_2[4], ele_2[3], read_name, "TRA", ele_1[4]]
+                        [
+                            "B",
+                            ele_1.ref_end,
+                            ele_2.chrom,
+                            ele_2.ref_end,
+                            read_name,
+                            "TRA",
+                            ele_1.chrom,
+                        ]
                     )
                     # N]chr:pos]
                 else:
                     candidate.append(
-                        ["B", ele_2[3], ele_1[4], ele_1[3], read_name, "TRA", ele_2[4]]
+                        [
+                            "B",
+                            ele_2.ref_end,
+                            ele_1.chrom,
+                            ele_1.ref_end,
+                            read_name,
+                            "TRA",
+                            ele_2.chrom,
+                        ]
                     )
                     # N]chr:pos]
         else:
-            if ele_2[5] == "+":
+            if ele_2.strand == "+":
                 # -&+
-                if ele_1[4] < ele_2[4]:
+                if ele_1.chrom < ele_2.chrom:
                     candidate.append(
-                        ["C", ele_1[2], ele_2[4], ele_2[2], read_name, "TRA", ele_1[4]]
+                        [
+                            "C",
+                            ele_1.ref_start,
+                            ele_2.chrom,
+                            ele_2.ref_start,
+                            read_name,
+                            "TRA",
+                            ele_1.chrom,
+                        ]
                     )
                     # [chr:pos[N
                 else:
                     candidate.append(
-                        ["C", ele_2[2], ele_1[4], ele_1[2], read_name, "TRA", ele_2[4]]
+                        [
+                            "C",
+                            ele_2.ref_start,
+                            ele_1.chrom,
+                            ele_1.ref_start,
+                            read_name,
+                            "TRA",
+                            ele_2.chrom,
+                        ]
                     )
                     # [chr:pos[N
             else:
                 # -&-
-                if ele_1[4] < ele_2[4]:
+                if ele_1.chrom < ele_2.chrom:
                     candidate.append(
-                        ["D", ele_1[2], ele_2[4], ele_2[3], read_name, "TRA", ele_1[4]]
+                        [
+                            "D",
+                            ele_1.ref_start,
+                            ele_2.chrom,
+                            ele_2.ref_end,
+                            read_name,
+                            "TRA",
+                            ele_1.chrom,
+                        ]
                     )
                     # ]chr:pos]N
                 else:
                     candidate.append(
-                        ["A", ele_2[3], ele_1[4], ele_1[2], read_name, "TRA", ele_2[4]]
+                        [
+                            "A",
+                            ele_2.ref_end,
+                            ele_1.chrom,
+                            ele_1.ref_start,
+                            read_name,
+                            "TRA",
+                            ele_2.chrom,
+                        ]
                     )
                     # N[chr:pos[
 
 
 def analysis_inv(ele_1, ele_2, read_name, candidate, SV_size):
-    if ele_1[5] == "+":
+    if ele_1.strand == "+":
         # +-
-        if ele_1[3] - ele_2[3] >= SV_size:
-            if ele_2[0] + 0.5 * (ele_1[3] - ele_2[3]) >= ele_1[1]:
-                candidate.append(["++", ele_2[3], ele_1[3], read_name, "INV", ele_1[4]])
+        if ele_1.ref_end - ele_2.ref_end >= SV_size:
+            if (
+                ele_2.read_start + 0.5 * (ele_1.ref_end - ele_2.ref_end)
+                >= ele_1.read_end
+            ):
+                candidate.append(
+                    ["++", ele_2.ref_end, ele_1.ref_end, read_name, "INV", ele_1.chrom]
+                )
                 # head-to-head
                 # 5'->5'
-        if ele_2[3] - ele_1[3] >= SV_size:
-            if ele_2[0] + 0.5 * (ele_2[3] - ele_1[3]) >= ele_1[1]:
-                candidate.append(["++", ele_1[3], ele_2[3], read_name, "INV", ele_1[4]])
+        if ele_2.ref_end - ele_1.ref_end >= SV_size:
+            if (
+                ele_2.read_start + 0.5 * (ele_2.ref_end - ele_1.ref_end)
+                >= ele_1.read_end
+            ):
+                candidate.append(
+                    ["++", ele_1.ref_end, ele_2.ref_end, read_name, "INV", ele_1.chrom]
+                )
                 # head-to-head
                 # 5'->5'
     else:
         # -+
-        if ele_2[2] - ele_1[2] >= SV_size:
-            if ele_2[0] + 0.5 * (ele_2[2] - ele_1[2]) >= ele_1[1]:
-                candidate.append(["--", ele_1[2], ele_2[2], read_name, "INV", ele_1[4]])
+        if ele_2.ref_start - ele_1.ref_start >= SV_size:
+            if (
+                ele_2.read_start + 0.5 * (ele_2.ref_start - ele_1.ref_start)
+                >= ele_1.read_end
+            ):
+                candidate.append(
+                    [
+                        "--",
+                        ele_1.ref_start,
+                        ele_2.ref_start,
+                        read_name,
+                        "INV",
+                        ele_1.chrom,
+                    ]
+                )
                 # tail-to-tail
                 # 3'->3'
-        if ele_1[2] - ele_2[2] >= SV_size:
-            if ele_2[0] + 0.5 * (ele_1[2] - ele_2[2]) >= ele_1[1]:
-                candidate.append(["--", ele_2[2], ele_1[2], read_name, "INV", ele_1[4]])
+        if ele_1.ref_start - ele_2.ref_start >= SV_size:
+            if (
+                ele_2.read_start + 0.5 * (ele_1.ref_start - ele_2.ref_start)
+                >= ele_1.read_end
+            ):
+                candidate.append(
+                    [
+                        "--",
+                        ele_2.ref_start,
+                        ele_1.ref_start,
+                        read_name,
+                        "INV",
+                        ele_1.chrom,
+                    ]
+                )
                 # tail-to-tail
                 # 3'->3'
 
@@ -180,84 +278,104 @@ def analysis_split_read(
     if len(SP_list) == 2:
         ele_1 = SP_list[0]
         ele_2 = SP_list[1]
-        if ele_1[4] == ele_2[4]:
-            if ele_1[5] != ele_2[5]:
+        if ele_1.chrom == ele_2.chrom:
+            if ele_1.strand != ele_2.strand:
                 analysis_inv(ele_1, ele_2, read_name, candidate, SV_size)
 
             else:
                 # dup & ins & del
                 a = 0
-                if ele_1[5] == "-":
+                if ele_1.strand == "-":
                     ele_1 = SplitRead(
-                        RLength - SP_list[a + 1][1],
-                        RLength - SP_list[a + 1][0],
+                        RLength - SP_list[a + 1].read_end,
+                        RLength - SP_list[a + 1].read_start,
                         *SP_list[a + 1][2:]
                     )
                     ele_2 = SplitRead(
-                        RLength - SP_list[a][1],
-                        RLength - SP_list[a][0],
+                        RLength - SP_list[a].read_end,
+                        RLength - SP_list[a].read_start,
                         *SP_list[a][2:]
                     )
                     query = query[::-1]
 
-                if ele_1[3] - ele_2[2] >= SV_size:
-                    # if ele_2[1] - ele_1[1] >= ele_1[3] - ele_2[2]:
-                    if ele_2[0] - ele_1[1] >= ele_1[3] - ele_2[2]:
+                if ele_1.ref_end - ele_2.ref_start >= SV_size:
+                    # if ele_2.read_end - ele_1.read_end >= ele_1.ref_end - ele_2.ref_start:
+                    if (
+                        ele_2.read_start - ele_1.read_end
+                        >= ele_1.ref_end - ele_2.ref_start
+                    ):
                         candidate.append(
                             [
-                                (ele_1[3] + ele_2[2]) / 2,
-                                ele_2[0] + ele_1[3] - ele_2[2] - ele_1[1],
+                                (ele_1.ref_end + ele_2.ref_start) / 2,
+                                ele_2.read_start
+                                + ele_1.ref_end
+                                - ele_2.ref_start
+                                - ele_1.read_end,
                                 read_name,
                                 str(
                                     query[
-                                        ele_1[1]
-                                        + int((ele_1[3] - ele_2[2]) / 2) : ele_2[0]
-                                        - int((ele_1[3] - ele_2[2]) / 2)
+                                        ele_1.read_end
+                                        + int(
+                                            (ele_1.ref_end - ele_2.ref_start) / 2
+                                        ) : ele_2.read_start
+                                        - int((ele_1.ref_end - ele_2.ref_start) / 2)
                                     ]
                                 ),
                                 "INS",
-                                ele_2[4],
+                                ele_2.chrom,
                             ]
                         )
                     else:
                         candidate.append(
-                            [ele_2[2], ele_1[3], read_name, "DUP", ele_2[4]]
+                            [
+                                ele_2.ref_start,
+                                ele_1.ref_end,
+                                read_name,
+                                "DUP",
+                                ele_2.chrom,
+                            ]
                         )
 
-                delta_length = ele_2[0] + ele_1[3] - ele_2[2] - ele_1[1]
+                delta_length = (
+                    ele_2.read_start + ele_1.ref_end - ele_2.ref_start - ele_1.read_end
+                )
                 if (
-                    ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                    ele_1.ref_end - ele_2.ref_start < max(SV_size, delta_length / 5)
                     and delta_length >= SV_size
                 ):
-                    if ele_2[2] - ele_1[3] <= max(100, delta_length / 5) and (
-                        delta_length <= MaxSize or MaxSize == -1
-                    ):
+                    if ele_2.ref_start - ele_1.ref_end <= max(
+                        100, delta_length / 5
+                    ) and (delta_length <= MaxSize or MaxSize == -1):
                         candidate.append(
                             [
-                                (ele_2[2] + ele_1[3]) / 2,
+                                (ele_2.ref_start + ele_1.ref_end) / 2,
                                 delta_length,
                                 read_name,
                                 str(
                                     query[
-                                        ele_1[1]
-                                        + int((ele_2[2] - ele_1[3]) / 2) : ele_2[0]
-                                        - int((ele_2[2] - ele_1[3]) / 2)
+                                        ele_1.read_end
+                                        + int(
+                                            (ele_2.ref_start - ele_1.ref_end) / 2
+                                        ) : ele_2.read_start
+                                        - int((ele_2.ref_start - ele_1.ref_end) / 2)
                                     ]
                                 ),
                                 "INS",
-                                ele_2[4],
+                                ele_2.chrom,
                             ]
                         )
-                delta_length = ele_2[2] - ele_2[0] + ele_1[1] - ele_1[3]
+                delta_length = (
+                    ele_2.ref_start - ele_2.read_start + ele_1.read_end - ele_1.ref_end
+                )
                 if (
-                    ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                    ele_1.ref_end - ele_2.ref_start < max(SV_size, delta_length / 5)
                     and delta_length >= SV_size
                 ):
-                    if ele_2[0] - ele_1[1] <= max(100, delta_length / 5) and (
-                        delta_length <= MaxSize or MaxSize == -1
-                    ):
+                    if ele_2.read_start - ele_1.read_end <= max(
+                        100, delta_length / 5
+                    ) and (delta_length <= MaxSize or MaxSize == -1):
                         candidate.append(
-                            [ele_1[3], delta_length, read_name, "DEL", ele_2[4]]
+                            [ele_1.ref_end, delta_length, read_name, "DEL", ele_2.chrom]
                         )
         else:
             trigger_INS_TRA = 1
@@ -270,26 +388,33 @@ def analysis_split_read(
             ele_2 = SP_list[a + 1]
             ele_3 = SP_list[a + 2]
 
-            if ele_1[4] == ele_2[4]:
-                if ele_2[4] == ele_3[4]:
-                    if ele_1[5] == ele_3[5] and ele_1[5] != ele_2[5]:
-                        if ele_2[5] == "-":
+            if ele_1.chrom == ele_2.chrom:
+                if ele_2.chrom == ele_3.chrom:
+                    if ele_1.strand == ele_3.strand and ele_1.strand != ele_2.strand:
+                        if ele_2.strand == "-":
                             # +-+
                             if (
-                                ele_2[0] + 0.5 * (ele_3[2] - ele_1[3]) >= ele_1[1]
-                                and ele_3[0] + 0.5 * (ele_3[2] - ele_1[3]) >= ele_2[1]
+                                ele_2.read_start
+                                + 0.5 * (ele_3.ref_start - ele_1.ref_end)
+                                >= ele_1.read_end
+                                and ele_3.read_start
+                                + 0.5 * (ele_3.ref_start - ele_1.ref_end)
+                                >= ele_2.read_end
                             ):
                                 # No overlaps in split reads
 
-                                if ele_2[2] >= ele_1[3] and ele_3[2] >= ele_2[3]:
+                                if (
+                                    ele_2.ref_start >= ele_1.ref_end
+                                    and ele_3.ref_start >= ele_2.ref_end
+                                ):
                                     candidate.append(
                                         [
                                             "++",
-                                            ele_1[3],
-                                            ele_2[3],
+                                            ele_1.ref_end,
+                                            ele_2.ref_end,
                                             read_name,
                                             "INV",
-                                            ele_1[4],
+                                            ele_1.chrom,
                                         ]
                                     )
                                     # head-to-head
@@ -297,11 +422,11 @@ def analysis_split_read(
                                     candidate.append(
                                         [
                                             "--",
-                                            ele_2[2],
-                                            ele_3[2],
+                                            ele_2.ref_start,
+                                            ele_3.ref_start,
                                             read_name,
                                             "INV",
-                                            ele_1[4],
+                                            ele_1.chrom,
                                         ]
                                     )
                                     # tail-to-tail
@@ -309,23 +434,27 @@ def analysis_split_read(
                         else:
                             # -+-
                             if (
-                                ele_1[1] <= ele_2[0] + 0.5 * (ele_1[2] - ele_3[3])
-                                and ele_3[0] + 0.5 * (ele_1[2] - ele_3[3]) >= ele_2[1]
+                                ele_1.read_end
+                                <= ele_2.read_start
+                                + 0.5 * (ele_1.ref_start - ele_3.ref_end)
+                                and ele_3.read_start
+                                + 0.5 * (ele_1.ref_start - ele_3.ref_end)
+                                >= ele_2.read_end
                             ):
                                 # No overlaps in split reads
 
                                 if (
-                                    ele_2[2] - ele_3[3] >= -50
-                                    and ele_1[2] - ele_2[3] >= -50
+                                    ele_2.ref_start - ele_3.ref_end >= -50
+                                    and ele_1.ref_start - ele_2.ref_end >= -50
                                 ):
                                     candidate.append(
                                         [
                                             "++",
-                                            ele_3[3],
-                                            ele_2[3],
+                                            ele_3.ref_end,
+                                            ele_2.ref_end,
                                             read_name,
                                             "INV",
-                                            ele_1[4],
+                                            ele_1.chrom,
                                         ]
                                     )
                                     # head-to-head
@@ -333,19 +462,19 @@ def analysis_split_read(
                                     candidate.append(
                                         [
                                             "--",
-                                            ele_2[2],
-                                            ele_1[2],
+                                            ele_2.ref_start,
+                                            ele_1.ref_start,
                                             read_name,
                                             "INV",
-                                            ele_1[4],
+                                            ele_1.chrom,
                                         ]
                                     )
                                     # tail-to-tail
                                     # 3'->3'
 
                     if len(SP_list) - 3 == a:
-                        if ele_1[5] != ele_3[5]:
-                            if ele_2[5] == ele_1[5]:
+                        if ele_1.strand != ele_3.strand:
+                            if ele_2.strand == ele_1.strand:
                                 # ++-/--+
                                 analysis_inv(
                                     ele_2, ele_3, read_name, candidate, SV_size
@@ -356,80 +485,117 @@ def analysis_split_read(
                                     ele_1, ele_2, read_name, candidate, SV_size
                                 )
 
-                    if ele_1[5] == ele_3[5] and ele_1[5] == ele_2[5]:
+                    if ele_1.strand == ele_3.strand and ele_1.strand == ele_2.strand:
                         # dup & ins & del
-                        if ele_1[5] == "-":
+                        if ele_1.strand == "-":
                             ele_1 = SplitRead(
-                                RLength - SP_list[a + 2][1],
-                                RLength - SP_list[a + 2][0],
+                                RLength - SP_list[a + 2].read_end,
+                                RLength - SP_list[a + 2].read_start,
                                 *SP_list[a + 2][2:]
                             )
                             ele_2 = SplitRead(
-                                RLength - SP_list[a + 1][1],
-                                RLength - SP_list[a + 1][0],
+                                RLength - SP_list[a + 1].read_end,
+                                RLength - SP_list[a + 1].read_start,
                                 *SP_list[a + 1][2:]
                             )
                             ele_3 = SplitRead(
-                                RLength - SP_list[a][1],
-                                RLength - SP_list[a][0],
+                                RLength - SP_list[a].read_end,
+                                RLength - SP_list[a].read_start,
                                 *SP_list[a][2:]
                             )
                             query = query[::-1]
 
-                        if ele_2[3] - ele_3[2] >= SV_size and ele_2[2] < ele_3[3]:
+                        if (
+                            ele_2.ref_end - ele_3.ref_start >= SV_size
+                            and ele_2.ref_start < ele_3.ref_end
+                        ):
                             candidate.append(
-                                [ele_3[2], ele_2[3], read_name, "DUP", ele_2[4]]
+                                [
+                                    ele_3.ref_start,
+                                    ele_2.ref_end,
+                                    read_name,
+                                    "DUP",
+                                    ele_2.chrom,
+                                ]
                             )
 
                         if a == 0:
-                            if ele_1[3] - ele_2[2] >= SV_size:
+                            if ele_1.ref_end - ele_2.ref_start >= SV_size:
                                 candidate.append(
-                                    [ele_2[2], ele_1[3], read_name, "DUP", ele_2[4]]
+                                    [
+                                        ele_2.ref_start,
+                                        ele_1.ref_end,
+                                        read_name,
+                                        "DUP",
+                                        ele_2.chrom,
+                                    ]
                                 )
 
-                        delta_length = ele_2[0] + ele_1[3] - ele_2[2] - ele_1[1]
+                        delta_length = (
+                            ele_2.read_start
+                            + ele_1.ref_end
+                            - ele_2.ref_start
+                            - ele_1.read_end
+                        )
                         if (
-                            ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                            ele_1.ref_end - ele_2.ref_start
+                            < max(SV_size, delta_length / 5)
                             and delta_length >= SV_size
                         ):
-                            if ele_2[2] - ele_1[3] <= max(100, delta_length / 5) and (
-                                delta_length <= MaxSize or MaxSize == -1
-                            ):
-                                if ele_3[2] >= ele_2[3]:
+                            if ele_2.ref_start - ele_1.ref_end <= max(
+                                100, delta_length / 5
+                            ) and (delta_length <= MaxSize or MaxSize == -1):
+                                if ele_3.ref_start >= ele_2.ref_end:
                                     candidate.append(
                                         [
-                                            (ele_2[2] + ele_1[3]) / 2,
+                                            (ele_2.ref_start + ele_1.ref_end) / 2,
                                             delta_length,
                                             read_name,
                                             str(
                                                 query[
-                                                    ele_1[1]
+                                                    ele_1.read_end
                                                     + int(
-                                                        (ele_2[2] - ele_1[3]) / 2
-                                                    ) : ele_2[0]
-                                                    - int((ele_2[2] - ele_1[3]) / 2)
+                                                        (
+                                                            ele_2.ref_start
+                                                            - ele_1.ref_end
+                                                        )
+                                                        / 2
+                                                    ) : ele_2.read_start
+                                                    - int(
+                                                        (
+                                                            ele_2.ref_start
+                                                            - ele_1.ref_end
+                                                        )
+                                                        / 2
+                                                    )
                                                 ]
                                             ),
                                             "INS",
-                                            ele_2[4],
+                                            ele_2.chrom,
                                         ]
                                     )
-                        delta_length = ele_2[2] - ele_2[0] + ele_1[1] - ele_1[3]
+                        delta_length = (
+                            ele_2.ref_start
+                            - ele_2.read_start
+                            + ele_1.read_end
+                            - ele_1.ref_end
+                        )
                         if (
-                            ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                            ele_1.ref_end - ele_2.ref_start
+                            < max(SV_size, delta_length / 5)
                             and delta_length >= SV_size
                         ):
-                            if ele_2[0] - ele_1[1] <= max(100, delta_length / 5) and (
-                                delta_length <= MaxSize or MaxSize == -1
-                            ):
-                                if ele_3[2] >= ele_2[3]:
+                            if ele_2.read_start - ele_1.read_end <= max(
+                                100, delta_length / 5
+                            ) and (delta_length <= MaxSize or MaxSize == -1):
+                                if ele_3.ref_start >= ele_2.ref_end:
                                     candidate.append(
                                         [
-                                            ele_1[3],
+                                            ele_1.ref_end,
                                             delta_length,
                                             read_name,
                                             "DEL",
-                                            ele_2[4],
+                                            ele_2.chrom,
                                         ]
                                     )
 
@@ -437,109 +603,159 @@ def analysis_split_read(
                             ele_1 = ele_2
                             ele_2 = ele_3
 
-                            delta_length = ele_2[0] + ele_1[3] - ele_2[2] - ele_1[1]
+                            delta_length = (
+                                ele_2.read_start
+                                + ele_1.ref_end
+                                - ele_2.ref_start
+                                - ele_1.read_end
+                            )
                             if (
-                                ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                                ele_1.ref_end - ele_2.ref_start
+                                < max(SV_size, delta_length / 5)
                                 and delta_length >= SV_size
                             ):
-                                if ele_2[2] - ele_1[3] <= max(
+                                if ele_2.ref_start - ele_1.ref_end <= max(
                                     100, delta_length / 5
                                 ) and (delta_length <= MaxSize or MaxSize == -1):
                                     candidate.append(
                                         [
-                                            (ele_2[2] + ele_1[3]) / 2,
+                                            (ele_2.ref_start + ele_1.ref_end) / 2,
                                             delta_length,
                                             read_name,
                                             str(
                                                 query[
-                                                    ele_1[1]
+                                                    ele_1.read_end
                                                     + int(
-                                                        (ele_2[2] - ele_1[3]) / 2
-                                                    ) : ele_2[0]
-                                                    - int((ele_2[2] - ele_1[3]) / 2)
+                                                        (
+                                                            ele_2.ref_start
+                                                            - ele_1.ref_end
+                                                        )
+                                                        / 2
+                                                    ) : ele_2.read_start
+                                                    - int(
+                                                        (
+                                                            ele_2.ref_start
+                                                            - ele_1.ref_end
+                                                        )
+                                                        / 2
+                                                    )
                                                 ]
                                             ),
                                             "INS",
-                                            ele_2[4],
+                                            ele_2.chrom,
                                         ]
                                     )
 
-                            delta_length = ele_2[2] - ele_2[0] + ele_1[1] - ele_1[3]
+                            delta_length = (
+                                ele_2.ref_start
+                                - ele_2.read_start
+                                + ele_1.read_end
+                                - ele_1.ref_end
+                            )
                             if (
-                                ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
-                                and ele_2[2] - ele_2[0] + ele_1[1] - ele_1[3] >= SV_size
+                                ele_1.ref_end - ele_2.ref_start
+                                < max(SV_size, delta_length / 5)
+                                and ele_2.ref_start
+                                - ele_2.read_start
+                                + ele_1.read_end
+                                - ele_1.ref_end
+                                >= SV_size
                             ):
-                                if ele_2[0] - ele_1[1] <= max(
+                                if ele_2.read_start - ele_1.read_end <= max(
                                     100, delta_length / 5
                                 ) and (delta_length <= MaxSize or MaxSize == -1):
                                     candidate.append(
                                         [
-                                            ele_1[3],
+                                            ele_1.ref_end,
                                             delta_length,
                                             read_name,
                                             "DEL",
-                                            ele_2[4],
+                                            ele_2.chrom,
                                         ]
                                     )
 
                     if (
                         len(SP_list) - 3 == a
-                        and ele_1[5] != ele_2[5]
-                        and ele_2[5] == ele_3[5]
+                        and ele_1.strand != ele_2.strand
+                        and ele_2.strand == ele_3.strand
                     ):
                         ele_1 = ele_2
                         ele_2 = ele_3
                         ele_3 = None
-                    if ele_3 == None or (ele_1[5] == ele_2[5] and ele_2[5] != ele_3[5]):
-                        if ele_1[5] == "-":
+                    if ele_3 == None or (
+                        ele_1.strand == ele_2.strand and ele_2.strand != ele_3.strand
+                    ):
+                        if ele_1.strand == "-":
                             ele_1 = SplitRead(
-                                RLength - SP_list[a + 2][1],
-                                RLength - SP_list[a + 2][0],
+                                RLength - SP_list[a + 2].read_end,
+                                RLength - SP_list[a + 2].read_start,
                                 *SP_list[a + 2][2:]
                             )
                             ele_2 = SplitRead(
-                                RLength - SP_list[a + 1][1],
-                                RLength - SP_list[a + 1][0],
+                                RLength - SP_list[a + 1].read_end,
+                                RLength - SP_list[a + 1].read_start,
                                 *SP_list[a + 1][2:]
                             )
                             query = query[::-1]
-                        delta_length = ele_2[0] + ele_1[3] - ele_2[2] - ele_1[1]
+                        delta_length = (
+                            ele_2.read_start
+                            + ele_1.ref_end
+                            - ele_2.ref_start
+                            - ele_1.read_end
+                        )
                         if (
-                            ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                            ele_1.ref_end - ele_2.ref_start
+                            < max(SV_size, delta_length / 5)
                             and delta_length >= SV_size
                         ):
-                            if ele_2[2] - ele_1[3] <= max(100, delta_length / 5) and (
-                                delta_length <= MaxSize or MaxSize == -1
-                            ):
+                            if ele_2.ref_start - ele_1.ref_end <= max(
+                                100, delta_length / 5
+                            ) and (delta_length <= MaxSize or MaxSize == -1):
                                 candidate.append(
                                     [
-                                        (ele_2[2] + ele_1[3]) / 2,
+                                        (ele_2.ref_start + ele_1.ref_end) / 2,
                                         delta_length,
                                         read_name,
                                         str(
                                             query[
-                                                ele_1[1]
+                                                ele_1.read_end
                                                 + int(
-                                                    (ele_2[2] - ele_1[3]) / 2
-                                                ) : ele_2[0]
-                                                - int((ele_2[2] - ele_1[3]) / 2)
+                                                    (ele_2.ref_start - ele_1.ref_end)
+                                                    / 2
+                                                ) : ele_2.read_start
+                                                - int(
+                                                    (ele_2.ref_start - ele_1.ref_end)
+                                                    / 2
+                                                )
                                             ]
                                         ),
                                         "INS",
-                                        ele_2[4],
+                                        ele_2.chrom,
                                     ]
                                 )
 
-                        delta_length = ele_2[2] - ele_2[0] + ele_1[1] - ele_1[3]
+                        delta_length = (
+                            ele_2.ref_start
+                            - ele_2.read_start
+                            + ele_1.read_end
+                            - ele_1.ref_end
+                        )
                         if (
-                            ele_1[3] - ele_2[2] < max(SV_size, delta_length / 5)
+                            ele_1.ref_end - ele_2.ref_start
+                            < max(SV_size, delta_length / 5)
                             and delta_length >= SV_size
                         ):
-                            if ele_2[0] - ele_1[1] <= max(100, delta_length / 5) and (
-                                delta_length <= MaxSize or MaxSize == -1
-                            ):
+                            if ele_2.read_start - ele_1.read_end <= max(
+                                100, delta_length / 5
+                            ) and (delta_length <= MaxSize or MaxSize == -1):
                                 candidate.append(
-                                    [ele_1[3], delta_length, read_name, "DEL", ele_2[4]]
+                                    [
+                                        ele_1.ref_end,
+                                        delta_length,
+                                        read_name,
+                                        "DEL",
+                                        ele_2.chrom,
+                                    ]
                                 )
 
             else:
@@ -547,57 +763,59 @@ def analysis_split_read(
                 analysis_bnd(ele_1, ele_2, read_name, candidate)
 
                 if len(SP_list) - 3 == a:
-                    if ele_2[4] != ele_3[4]:
+                    if ele_2.chrom != ele_3.chrom:
                         analysis_bnd(ele_2, ele_3, read_name, candidate)
 
     if len(SP_list) >= 3 and trigger_INS_TRA == 1:
-        if SP_list[0][4] == SP_list[-1][4]:
+        if SP_list[0].chrom == SP_list[-1].chrom:
             # print(SP_list[0])
             # print(SP_list[-1])
-            if SP_list[0][5] != SP_list[-1][5]:
+            if SP_list[0].strand != SP_list[-1].strand:
                 pass
             else:
-                if SP_list[0][5] == "+":
+                if SP_list[0].strand == "+":
                     ele_1 = SP_list[0]
                     ele_2 = SP_list[-1]
                 else:
                     ele_1 = SplitRead(
-                        RLength - SP_list[-1][1],
-                        RLength - SP_list[-1][0],
+                        RLength - SP_list[-1].read_end,
+                        RLength - SP_list[-1].read_start,
                         *SP_list[-1][2:]
                     )
                     ele_2 = SplitRead(
-                        RLength - SP_list[0][1],
-                        RLength - SP_list[0][0],
+                        RLength - SP_list[0].read_end,
+                        RLength - SP_list[0].read_start,
                         *SP_list[0][2:]
                     )
                     query = query[::-1]
                 # print(ele_1)
                 # print(ele_2)
-                dis_ref = ele_2[2] - ele_1[3]
-                dis_read = ele_2[0] - ele_1[1]
+                dis_ref = ele_2.ref_start - ele_1.ref_end
+                dis_read = ele_2.read_start - ele_1.read_end
                 if (
                     dis_ref < 100
                     and dis_read - dis_ref >= SV_size
                     and (dis_read - dis_ref <= MaxSize or MaxSize == -1)
                 ):
-                    # print(min(ele_2[2], ele_1[3]), dis_read - dis_ref, read_name)
+                    # print(min(ele_2.ref_start, ele_1.ref_end), dis_read - dis_ref, read_name)
                     candidate.append(
                         [
-                            min(ele_2[2], ele_1[3]),
+                            min(ele_2.ref_start, ele_1.ref_end),
                             dis_read - dis_ref,
                             read_name,
                             str(
                                 query[
-                                    ele_1[1]
-                                    + int(dis_ref / 2) : ele_2[0]
+                                    ele_1.read_end
+                                    + int(dis_ref / 2) : ele_2.read_start
                                     - int(dis_ref / 2)
                                 ]
                             ),
                             "INS",
-                            ele_2[4],
+                            ele_2.chrom,
                         ]
                     )
 
                 if dis_ref <= -SV_size:
-                    candidate.append([ele_2[2], ele_1[3], read_name, "DUP", ele_2[4]])
+                    candidate.append(
+                        [ele_2.ref_start, ele_1.ref_end, read_name, "DUP", ele_2.chrom]
+                    )

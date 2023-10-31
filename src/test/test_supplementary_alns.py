@@ -21,9 +21,11 @@ def supplementary_info(draw: st.DrawFn):
     strand = draw(st.sampled_from("+-"))
     mapq = draw(st.integers(min_value=0, max_value=60))
     just_a_number = draw(st.integers(min_value=0))
-    cigar_lens = draw(st.lists(st.integers(1), min_size=3, max_size=100))
+    cigar_lens = draw(st.lists(st.integers(min_value=1), min_size=3, max_size=100))
+    if len(cigar_lens) % 2 == 0:
+        # Need odd number of lengths
+        cigar_lens.append(draw(st.integers(min_value=1)))
     n_cigar_ops = len(cigar_lens)
-    assume(n_cigar_ops % 2 == 1)
 
     clip_type = draw(st.sampled_from("SH"))
     cigar_ops = [f"{cigar_lens[0]}{clip_type}", f"{cigar_lens[1]}M"]
