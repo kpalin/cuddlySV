@@ -190,9 +190,33 @@ def analysis_bnd(ele_1: SplitRead, ele_2: SplitRead, read_name: str, candidate: 
                     # N[chr:pos[
 
 
+def is_1d2_pair(ele_1: SplitRead, ele_2: SplitRead) -> bool:
+    """Check if the split reads form merged 1d2 molecule
+
+    Args:
+        ele_1 (SplitRead): One split
+        ele_2 (SplitRead): Next split
+
+    Returns:
+        bool: True if the input splits are same chromosome and opposite strand
+    """
+    if ele_1.chrom == ele_2.chrom and ele_1.strand != ele_2.strand:
+        overlap_len = min(ele_1.ref_end, ele_2.ref_end) - max(
+            ele_1.ref_start, ele_2.ref_start
+        )
+        shorter_ele_len = min(
+            ele_1.ref_end - ele_1.ref_start, ele_2.ref_end - ele_2.ref_start
+        )
+        return overlap_len / shorter_ele_len > 0.95
+    else:
+        return False
+
+
 def analysis_inv(
     ele_1: SplitRead, ele_2: SplitRead, read_name: str, candidate: List, SV_size: int
 ):
+    if is_1d2_pair(ele_1, ele_2):
+        return
     if ele_1.strand == "+":
         # +-
         if ele_1.ref_end - ele_2.ref_end >= SV_size:
@@ -272,33 +296,31 @@ def analysis_split_read(
     # for i in SP_list:
     # 	print(i)
 
-    # detect INS involoved in a translocation
-    trigger_INS_TRA = 0
-
     # Store Strands of INV
 
-    if len(SP_list) == 2:
-        ele_1 = SP_list[0]
-        ele_2 = SP_list[1]
+    for sp_idx in range(len(SP_list) - 1):
+        ele_1, ele_2 = SP_list[sp_idx : (sp_idx + 2)]
+
         if ele_1.chrom == ele_2.chrom:
             analyse_ins_dup_del(
                 SV_size, RLength, read_name, candidate, MaxSize, query, ele_1, ele_2
             )
         else:
-            trigger_INS_TRA = 1
             analysis_bnd(ele_1, ele_2, read_name, candidate)
 
-    else:
+    if len(SP_list) >= 3:
+        # detect INS involoved in a translocation
+        trigger_INS_TRA = 0
         # over three splits
         for a in range(len(SP_list[1:-1])):
             query, trigger_INS_TRA = analyse_over_three_splits(
                 SV_size, RLength, read_name, candidate, MaxSize, query, SP_list, a
             )
 
-    if len(SP_list) >= 3 and trigger_INS_TRA == 1:
-        analyse_insertion_in_translocation(
-            SV_size, RLength, read_name, candidate, MaxSize, query, SP_list
-        )
+        if trigger_INS_TRA == 1:
+            analyse_insertion_in_translocation(
+                SV_size, RLength, read_name, candidate, MaxSize, query, SP_list
+            )
 
 
 def analyse_ins_dup_del(

@@ -660,7 +660,10 @@ def acquire_clip_pos(deal_cigar):
     return [first_pos, last_pos, bias]
 
 
-def organize_split_signal(
+from cuteSV.split_signal import organize_split_signal
+
+
+def _organize_split_signal(
     primary_info,
     Supplementary_info,
     total_L,
