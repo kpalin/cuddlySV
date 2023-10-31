@@ -1,8 +1,8 @@
 from collections import namedtuple
 from typing import List
 import numpy as np
-from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt, ChrReadInfo
-from cuteSV.cuteSV_Description import setupLogging
+from cuteSV.genotype import cal_CI, overlap_cover, assign_gt, ChrReadInfo
+from cuteSV.Description import setupLogging
 import logging
 
 # TODO:1. Identify DP with samfile pointer;

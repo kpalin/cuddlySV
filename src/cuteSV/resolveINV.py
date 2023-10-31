@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-from cuteSV.cuteSV_genotype import overlap_cover, assign_gt
+from cuteSV.genotype import overlap_cover, assign_gt
 
 
 def resolution_INV(

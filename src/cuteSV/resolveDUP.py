@@ -3,7 +3,7 @@ from collections import namedtuple
 from typing import List
 import numpy as np
 import logging
-from cuteSV.cuteSV_genotype import cal_CI, overlap_cover, assign_gt
+from cuteSV.genotype import cal_CI, overlap_cover, assign_gt
 
 # TODO: 1. Identify DP with samfile pointer;
 # TODO: 2. Add CIPOS, CILEN and/or CIEND;
