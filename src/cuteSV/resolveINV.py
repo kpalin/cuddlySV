@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-from cuteSV.genotype import overlap_cover, assign_gt
+from cuteSV.genotype import load_reads, overlap_cover, assign_gt
 
 
 def resolution_INV(
@@ -260,14 +260,7 @@ def run_inv(args):
 
 
 def call_gt_inv(temporary_dir, chr, candidate_single_SV, max_cluster_bias):
-    reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
-    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
-    for line in readsfile:
-        seq = line.strip().split("\t")
-        if seq[0] != chr:
-            continue
-        reads_list.append([int(seq[1]), int(seq[2]), int(seq[3]), seq[4]])
-    readsfile.close()
+    reads_list = load_reads(temporary_dir,chr)
     svs_list = list()
     for item in candidate_single_SV:
         svs_list.append(

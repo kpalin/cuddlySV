@@ -1,6 +1,8 @@
 /dist/
 /src/*.egg-info/
 /src/*.pyc
+/src/somatic/.snakemake/
+**/.hypothesis/*
 /build/
-/dev/
+**/dev/**
 __pycache__/

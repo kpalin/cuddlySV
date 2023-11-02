@@ -141,14 +141,36 @@ def count_coverage(chr, s, e, f, read_count, up_bound, itround):
     return status
 
 
+def load_reads(temporary_dir: str, chr: str) -> List[ChrReadInfo]:
+    """Read the reads.sigs file from work directory
+
+    Args:
+        temporary_dir (str): Used work directory as string
+        chr (str): Chromosome to be read.
+
+    Returns:
+        List[ChrReadInfo]: List of used reads in given chromosome
+    """
+    reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
+    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
+    for line in readsfile:
+        seq = line.strip().split("\t")
+        if seq[0] != chr:
+            continue
+        reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
+        # reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
+    readsfile.close()
+    return reads_list
+
+
 def overlap_cover(
     svs_list: Tuple[int, int], reads_list: List[ChrReadInfo]
 ) -> Tuple[Dict[int, int], Dict[int, int], Dict[int, str]]:
     """Calculating something with sweepline method
 
     Args:
-        svs_list (Tuple[int, int]): List of start,end positions of SV:s_ reads_list
-        (List[ChrReadInfo]): List of read start,end,primary,name:s
+        svs_list (Tuple[int, int]): List of start,end positions of SV:s_
+        reads_list (List[ChrReadInfo]): List of read start,end,primary,name:s
 
     Returns:
         (iteration, primary_num, cover): Dictionaries indexed to/by svs_list,
@@ -171,7 +193,7 @@ def overlap_cover(
         sort_list.append([sv[0], Transition.SVstart, sv_idx])
         sort_list.append([sv[1], Transition.SVend, sv_idx])
 
-    # Sort list by position, starts before ends when equeal.
+    # Sort list by position, starts before ends when equal.
     sort_list = sorted(sort_list, key=lambda x: (x[0], x[1].value))
     svs_set = set()  # indices of SVs within the sweepline
     read_set = set()  # indicies of the reads within the sweepline
@@ -232,10 +254,10 @@ def assign_gt(
     """Assign genotype and calculate some format values for VCF output
 
     Args:
-        iteration_dict (Dict[int, int]): _description_
-        primary_num_dict (Dict[int, int]): _description_
-        cover_dict (Dict[int, str]): _description_
-        read_id_dict (Dict[int, str]): _description_
+        iteration_dict (Dict[int, int]): Output from overlap_cover()
+        primary_num_dict (Dict[int, int]): Output from overlap_cover()
+        cover_dict (Dict[int, str]): Output from overlap_cover()
+        read_id_dict (Dict[int, str]): Reads supporting the variant with index key:int.
 
     Returns:
         List[GTassignment]: (DV, DR, GT, GL,GQ, QUAL)

@@ -1,7 +1,7 @@
 from collections import namedtuple
 from typing import List
 import numpy as np
-from cuteSV.genotype import cal_CI, overlap_cover, assign_gt, ChrReadInfo
+from cuteSV.genotype import cal_CI, load_reads, overlap_cover, assign_gt, ChrReadInfo
 from cuteSV.Description import setupLogging
 import logging
 
@@ -531,15 +531,7 @@ def run_ins(args):
 
 
 def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias, svtype):
-    reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
-    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
-    for line in readsfile:
-        seq = line.strip().split("\t")
-        if seq[0] != chr:
-            continue
-        reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-        # reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-    readsfile.close()
+    reads_list = load_reads(temporary_dir, chr)
 
     svs_list = list()
     for item in candidate_single_SV:

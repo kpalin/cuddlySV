@@ -3,7 +3,7 @@ from collections import namedtuple
 from typing import List
 import numpy as np
 import logging
-from cuteSV.genotype import cal_CI, overlap_cover, assign_gt
+from cuteSV.genotype import cal_CI, load_reads, overlap_cover, assign_gt
 
 # TODO: 1. Identify DP with samfile pointer;
 # TODO: 2. Add CIPOS, CILEN and/or CIEND;
@@ -182,14 +182,7 @@ def run_dup(args):
 def call_gt_dup(
     temporary_dir, chr, candidate_single_SV: List[DuplicationSV], max_cluster_bias
 ):
-    reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
-    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
-    for line in readsfile:
-        seq = line.strip().split("\t")
-        if seq[0] != chr:
-            continue
-        reads_list.append([int(seq[1]), int(seq[2]), int(seq[3]), seq[4]])
-    readsfile.close()
+    reads_list = load_reads(temporary_dir,chr)
     svs_list = list()
     for item in candidate_single_SV:
         new_cluster_bias = min(max_cluster_bias, item[3] - item[2])

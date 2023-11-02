@@ -23,6 +23,7 @@ setup(
     zip_safe=False,
     install_requires=[
         "pysam",
+        "ncls",
         "Biopython",
         "Cigar",
         "numpy",
