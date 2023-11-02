@@ -67,7 +67,7 @@ def resolution_DEL(
         if pos - semi_del_cluster[-1][0] > max_cluster_bias:
             if len(semi_del_cluster) >= read_count:
                 if semi_del_cluster[-1][0] == semi_del_cluster[-1][1] == 0:
-                    pass
+                    pass  # Length and position of the last read are equal to zero! How does that happen?
                 else:
                     generate_del_cluster(
                         semi_del_cluster,

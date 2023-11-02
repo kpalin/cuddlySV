@@ -42,7 +42,10 @@ done
 shift $((OPTIND - 1))
 OPTIND=1
 OUTPATH=$(readlink -f "$OUTPATH")
-test ! -e "${OUTPATH}"
+test ! -e "${OUTPATH}" || (
+    echo "File ${OUTPATH} exist. Will not do anything!"
+    exit 1
+)
 # Make temporary directory which will be cleaned at script exit
 TEMPDIR=$(mktemp --directory -p "$(dirname "$OUTPATH")")
 function _cleanup {
@@ -50,26 +53,21 @@ function _cleanup {
 }
 trap _cleanup EXIT
 
-# Merge, but remove duplicates
+# Merge (Can't remove duplicates because CuteSV)
 find "${NORMALPATHS[@]}" -maxdepth 1 -name DEL.sigs -print0 |
-    xargs -0 sed -e 's/\b[a-zA-Z0-9_-]\+:/PanelOfNormals:/' |
-    sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/DEL.sigs" &
+    xargs -0 sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/DEL.sigs" &
 
 find "${NORMALPATHS[@]}" -maxdepth 1 -name INS.sigs -print0 |
-    xargs -0 sed -e 's/\b[a-zA-Z0-9_-]\+:/PanelOfNormals:/' |
-    sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/INS.sigs" &
+    xargs -0 sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/INS.sigs" &
 
 find "${NORMALPATHS[@]}" -maxdepth 1 -name INV.sigs -print0 |
-    xargs -0 sed -e 's/\b[a-zA-Z0-9_-]\+:/PanelOfNormals:/' |
-    sort -k 2,2 -k 3,3 -k 4,5n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/INV.sigs" &
+    xargs -0 sort -k 2,2 -k 3,3 -k 4,5n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/INV.sigs" &
 
 find "${NORMALPATHS[@]}" -maxdepth 1 -name TRA.sigs -print0 |
-    xargs -0 sed -e 's/\b[a-zA-Z0-9_-]\+:/PanelOfNormals:/' |
-    sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/TRA.sigs" &
+    xargs -0 sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/TRA.sigs" &
 
 find "${NORMALPATHS[@]}" -maxdepth 1 -name DUP.sigs -print0 |
-    xargs -0 sed -e 's/\b[a-zA-Z0-9_-]\+:/PanelOfNormals:/' |
-    sort -k 1,1r -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/DUP.sigs" &
+    xargs -0 sort -k 1,1r -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} >"${TEMPDIR}/DUP.sigs" &
 
 wait
 
