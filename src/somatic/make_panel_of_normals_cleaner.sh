@@ -15,7 +15,7 @@ set -o pipefail
 OUTPATH="panel_of_normals_wrk/"
 usage() {
     echo -e "usage:
-$0 -o OUTPATH/ i input.tsv
+$0 -o OUTPATH/ -i input.tsv
 
 -o OUTPATH/
 -i input.tsv   Tab separated list of normal sample \"workdir/\\tcalls_with_RNAMES.vcf\"
@@ -24,7 +24,6 @@ $0 -o OUTPATH/ i input.tsv
 
 }
 
-declare -a NORMALPATHS
 FIFTHofMEM=1G
 while getopts "o:hn:i:" flag; do
     case "$flag" in
@@ -61,7 +60,7 @@ cat "$INPUTFILE" | while read -r NORMALPATH NORMALVCF; do
         exit 1
     )
     for SIG_TYPE in DEL INS INV TRA DUP; do
-        rg -Ff "${TEMPDIR}/_reads.lst" "${NORMALPATH}/${SIG_TYPE}.sigs" >>"${TEMPDIR}/${SIG_TYPE}.sigs" &
+        grep -Ff "${TEMPDIR}/_reads.lst" "${NORMALPATH}/${SIG_TYPE}.sigs" >>"${TEMPDIR}/${SIG_TYPE}.sigs" &
     done
     wait
 done
@@ -69,15 +68,15 @@ mkdir "${OUTPATH}"
 
 # Merge (Can't remove duplicates because CuteSV)
 
-sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TEMPDIR}/DEL.sigs" >"${OUTPATH}/DEL.sigs" &
+sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} "${TEMPDIR}/DEL.sigs" >"${OUTPATH}/DEL.sigs" &
 
-sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TEMPDIR}/INS.sigs" >"${OUTPATH}/INS.sigs" &
+sort -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} "${TEMPDIR}/INS.sigs" >"${OUTPATH}/INS.sigs" &
 
-sort -k 2,2 -k 3,3 -k 4,5n -S ${FIFTHofMEM} "${TEMPDIR}/INV.sigs" >"${OUTPATH}/INV.sigs" &
+sort -k 2,2 -k 3,3 -k 4,5n --unique -S ${FIFTHofMEM} "${TEMPDIR}/INV.sigs" >"${OUTPATH}/INV.sigs" &
 
-sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n -S ${FIFTHofMEM} "${TEMPDIR}/TRA.sigs" >"${OUTPATH}/TRA.sigs" &
+sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n --unique -S ${FIFTHofMEM} "${TEMPDIR}/TRA.sigs" >"${OUTPATH}/TRA.sigs" &
 
-sort -k 1,1r -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TEMPDIR}/DUP.sigs" >"${OUTPATH}/DUP.sigs" &
+sort -k 1,1r -k 2,2 -k 3,4n --unique -S ${FIFTHofMEM} "${TEMPDIR}/DUP.sigs" >"${OUTPATH}/DUP.sigs" &
 
 wait
 

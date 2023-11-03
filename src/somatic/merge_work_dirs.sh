@@ -53,6 +53,8 @@ function _cleanup {
 }
 trap _cleanup EXIT
 
+# Can not remove duplicate reads since we need to keep the 'normal' information
+
 sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/DEL.sigs" "${NORMALPATH}/DEL.sigs" >"${TEMPDIR}/DEL.sigs" &
 
 sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/INS.sigs" "${NORMALPATH}/INS.sigs" >"${TEMPDIR}/INS.sigs" &

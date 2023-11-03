@@ -277,7 +277,7 @@ def analysis_inv(
                 # 3'->3'
 
 
-# TODO:  This function has a bug. Read aligned in 3 parts, large deletion followed by false inversion is not classified as deletion signal.
+
 def analysis_split_read(
     split_read: List[SplitRead],
     SV_size: int,

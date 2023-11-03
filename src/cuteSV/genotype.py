@@ -419,7 +419,7 @@ def output_BND(args, ref_g, svid, file, action, variant):
     file.write(
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=variant[0],
-            POS=str(int(variant[2]) + 1),
+            POS=str(int(variant[2]) +1 ),
             ID="cuddlySV.%s.%d" % ("BND", svid["BND"]),
             REF=reff,
             ALT=variant[1],

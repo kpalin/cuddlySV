@@ -517,7 +517,7 @@ def generate_ins_cluster(
 def run_del(args):
     setupLogging()
     try:
-        return resolution_DEL(*args)
+        return resolution_DEL(**args)
     except Exception:
         logging.exception("Error clustering DEL: %s", str(args))
 
@@ -525,7 +525,7 @@ def run_del(args):
 def run_ins(args):
     setupLogging()
     try:
-        return resolution_INS(*args)
+        return resolution_INS(**args)
     except Exception:
         logging.exception("Error clustering INS: %s", str(args))
 

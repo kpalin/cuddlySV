@@ -653,11 +653,11 @@ def acquire_clip_pos(deal_cigar):
     else:
         last_pos = 0
 
-    bias = 0
+    ref_span = 0
     for i in seq:
         if i[1] == "M" or i[1] == "D" or i[1] == "=" or i[1] == "X":
-            bias += i[0]
-    return [first_pos, last_pos, bias]
+            ref_span += i[0]
+    return [first_pos, last_pos, ref_span]
 
 
 from cuteSV.split_signal import organize_split_signal
@@ -996,10 +996,12 @@ def single_pipe(
     file = open(output, "w")
     for ele in candidate:
         if len(ele) == 5:
+            assert ele[-2] in ("DUP","DEL",)
             file.write(
                 "%s\t%s\t%d\t%d\t%s\n" % (ele[-2], ele[-1], ele[0], ele[1], ele[2])
             )
         elif len(ele) == 7:
+            assert ele[-2]=="TRA"
             file.write(
                 "%s\t%s\t%s\t%d\t%s\t%d\t%s\n"
                 % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3], ele[4])
@@ -1010,8 +1012,10 @@ def single_pipe(
                     "%s\t%s\t%s\t%d\t%d\t%s\n"
                     % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3])
                 )
+                assert ele[-2]=="INV"
                 # INV chr strand pos1 pos2 read_ID
             except:
+                assert ele[-2]=="INS"
                 file.write(
                     "%s\t%s\t%d\t%d\t%s\t%s\n"
                     % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3])
@@ -1080,7 +1084,7 @@ def main_ctrl(args, argv):
     # Apologise about the following line. I just can't fix all the silly directory handling here.
     temporary_dir = str(temporary_dir) + "/"
 
-    contigINFO = process_bam_file(args, temporary_dir, temp_dir_empty(temporary_dir))
+    contigINFO,read_group_name = process_bam_file(args, temporary_dir, temp_dir_empty(temporary_dir))
 
     #'''
     #'''
@@ -1109,40 +1113,38 @@ def main_ctrl(args, argv):
         # +++++DEL+++++
         for chr in valuable_chr["DEL"]:
             para = [
-                (
-                    temporary_dir,
-                    chr,
-                    "DEL",
-                    args.min_support,
-                    args.diff_ratio_merging_DEL,
-                    args.max_cluster_bias_DEL,
-                    # args.diff_ratio_filtering_DEL,
-                    min(args.min_support, 5),
-                    args.input,
-                    args.genotype,
-                    args.gt_round,
-                    args.remain_reads_ratio,
-                )
+                {
+                    "path":temporary_dir,
+                    "chr":chr,
+                    "svtype":"DEL",
+                    "read_count":args.min_support,
+                    "threshold_gloab":args.diff_ratio_merging_DEL,
+                    "max_cluster_bias":args.max_cluster_bias_DEL,
+                    "minimum_support_reads":min(args.min_support, 5),
+                    "bam_path":args.input,
+                    "action":args.genotype,
+                    "gt_round":args.gt_round,
+                    "remain_reads_ratio": args.remain_reads_ratio,
+                }
             ]
             result.append(analysis_pools.map_async(run_del, para))
 
         # +++++INS+++++
         for chr in valuable_chr["INS"]:
             para = [
-                (
-                    temporary_dir,
-                    chr,
-                    "INS",
-                    args.min_support,
-                    args.diff_ratio_merging_INS,
-                    args.max_cluster_bias_INS,
-                    # args.diff_ratio_filtering_INS,
-                    min(args.min_support, 5),
-                    args.input,
-                    args.genotype,
-                    args.gt_round,
-                    args.remain_reads_ratio,
-                )
+                {
+                    "path":temporary_dir,
+                    "chr":chr,
+                    "svtype":"INS",
+                    "read_count":args.min_support,
+                    "threshold_gloab":args.diff_ratio_merging_INS,
+                    "max_cluster_bias":args.max_cluster_bias_INS,
+                    "minimum_support_reads":min(args.min_support, 5),
+                    "bam_path":args.input,
+                    "action":args.genotype,
+                    "gt_round":args.gt_round,
+                    "remain_reads_ratio": args.remain_reads_ratio,
+                }
             ]
             result.append(
                 analysis_pools.map_async(run_ins, para, error_callback=error_handler)
@@ -1151,18 +1153,19 @@ def main_ctrl(args, argv):
         # +++++INV+++++
         for chr in valuable_chr["INV"]:
             para = [
-                (
-                    temporary_dir,
-                    chr,
-                    "INV",
-                    args.min_support,
-                    args.max_cluster_bias_INV,
-                    args.min_size,
-                    args.input,
-                    args.genotype,
-                    args.max_size,
-                    args.gt_round,
-                )
+
+                {
+                    "path":temporary_dir,
+                    "chr":chr,
+                    "svtype":"INV",
+                    "read_count":args.min_support,
+                    "max_cluster_bias":args.max_cluster_bias_INV,
+                    "sv_size":args.min_size,
+                    "bam_path":args.input,
+                    "action":args.genotype,
+                    "MaxSize":args.max_size,
+                    "gt_round":args.gt_round,
+                }
             ]
             result.append(
                 analysis_pools.map_async(run_inv, para, error_callback=error_handler)
@@ -1171,17 +1174,17 @@ def main_ctrl(args, argv):
         # +++++DUP+++++
         for chr in valuable_chr["DUP"]:
             para = [
-                (
-                    temporary_dir,
-                    chr,
-                    args.min_support,
-                    args.max_cluster_bias_DUP,
-                    args.min_size,
-                    args.input,
-                    args.genotype,
-                    args.max_size,
-                    args.gt_round,
-                )
+                {
+                    "path":temporary_dir,
+                    "chr":chr,
+                    "read_count":args.min_support,
+                    "max_cluster_bias":args.max_cluster_bias_DUP,
+                    "sv_size":args.min_size,
+                    "bam_path":args.input,
+                    "action":args.genotype,
+                    "MaxSize":args.max_size,
+                    "gt_round":args.gt_round,
+                }
             ]
             result.append(
                 analysis_pools.map_async(run_dup, para, error_callback=error_handler)
@@ -1191,17 +1194,17 @@ def main_ctrl(args, argv):
         for chr in valuable_chr["TRA"]:
             for chr2 in valuable_chr["TRA"][chr]:
                 para = [
-                    (
-                        temporary_dir,
-                        chr,
-                        chr2,
-                        args.min_support,
-                        args.diff_ratio_filtering_TRA,
-                        args.max_cluster_bias_TRA,
-                        args.input,
-                        args.genotype,
-                        args.gt_round,
-                    )
+                    {
+                        "path":temporary_dir,
+                        "chr_1":chr,
+                        "chr_2":chr2,
+                        "read_count":args.min_support,
+                        "overlap_size":args.diff_ratio_filtering_TRA,
+                        "max_cluster_bias":args.max_cluster_bias_TRA,
+                        "bam_path":args.input,
+                        "action":args.genotype,
+                        "gt_round":args.gt_round,
+                    }
                 ]
                 result.append(
                     analysis_pools.map_async(
@@ -1283,11 +1286,15 @@ def force_call_genotypes(args, temporary_dir):
 def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
     samfile = pysam.AlignmentFile(args.input)
     contig_num = len(samfile.get_index_statistics())
-    logging.info("The total number of chromsomes: %d" % (contig_num))
+    logging.info("The total number of chromosomes: %d" % (contig_num))
 
     Task_list = list()
     chr_name_list = list()
     contigINFO = list()
+    
+    rgs = samfile.header["RG"]
+    assert len(rgs)==1,"Alignment file should have exactly one read group."
+    read_group_name = rgs[0]["ID"]
 
     ref_ = samfile.get_index_statistics()
     for i in ref_:
@@ -1310,7 +1317,7 @@ def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
     #'''
     if update_temp_data:
         process_alignments(args, temporary_dir, Task_list, bed_regions)
-    return contigINFO
+    return (contigINFO,read_group_name)
 
 
 def process_alignments(args, temporary_dir, Task_list, bed_regions):

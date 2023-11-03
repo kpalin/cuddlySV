@@ -41,7 +41,7 @@ def resolution_TRA(
     semi_tra_cluster = list()
     semi_tra_cluster.append([0, 0, "", "N"])
     candidate_single_SV = list()
-
+    logging.info("Update A")
     file = open("%s%s.sigs" % (path, "TRA"), "r")
     for line in file:
         seq = line.strip("\n").split("\t")
@@ -50,8 +50,8 @@ def resolution_TRA(
         if seq[4] != chr_2:
             continue
 
-        pos_1 = int(seq[3])
-        pos_2 = int(seq[5])
+        pos_1 = int(seq[3]) -1
+        pos_2 = int(seq[5]) -1
         read_id = seq[6]
         BND_type = seq[2]
 
@@ -196,7 +196,7 @@ def generate_semi_tra_cluster(
                     TRA_1,
                     str(int(temp[0][0] / len(temp[0][2]))),
                     chr_2,
-                    str(int(temp[0][1] / len(temp[0][2]))),
+                    str(int(temp[0][1] / len(temp[0][2]))), 
                     str(len(set(temp[0][2]))),
                     str(DR),
                     str(GT),
@@ -302,7 +302,7 @@ def generate_semi_tra_cluster(
 
 
 def run_tra(args):
-    return resolution_TRA(*args)
+    return resolution_TRA(**args)
 
 
 def call_gt(

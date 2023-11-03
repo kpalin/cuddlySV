@@ -256,7 +256,7 @@ def generate_semi_inv_cluster(
 
 
 def run_inv(args):
-    return resolution_INV(*args)
+    return resolution_INV(**args)
 
 
 def call_gt_inv(temporary_dir, chr, candidate_single_SV, max_cluster_bias):

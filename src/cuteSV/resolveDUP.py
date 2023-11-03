@@ -176,7 +176,7 @@ def generate_dup_cluster(
 
 
 def run_dup(args):
-    return resolution_DUP(*args)
+    return resolution_DUP(**args)
 
 
 def call_gt_dup(
