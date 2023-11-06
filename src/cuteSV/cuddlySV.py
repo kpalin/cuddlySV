@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 import pysam
 import cigar
 import pyfastx
-from cuteSV.Description import parseArgs, setupLogging
+from cuteSV.Description import WorkDir, parseArgs, setupLogging
 from multiprocessing import Pool
 from cuteSV.CommandRunner import *
 
@@ -17,7 +17,6 @@ from cuteSV.resolveDUP import run_dup
 from cuteSV.genotype import (
     generate_output,
     generate_pvcf,
-    load_valuable_chr,
     load_bed,
 )
 from cuteSV.forcecalling import force_calling_chrom
@@ -931,7 +930,7 @@ def single_pipe(
     min_mapq,
     max_split_parts,
     min_read_len,
-    temp_dir,
+    temp_dir:Path,
     task,
     min_siglength,
     merge_del_threshold,
@@ -992,7 +991,7 @@ def single_pipe(
         logging.info("Skip %s:%d-%d." % (Chr_name, task[1], task[2]))
         return
 
-    output = "%ssignatures/_%s_%d_%d.bed" % (temp_dir, Chr_name, task[1], task[2])
+    output = temp_dir / "signatures/_%s_%d_%d.bed" % ( Chr_name, task[1], task[2])
     file = open(output, "w")
     for ele in candidate:
         if len(ele) == 5:
@@ -1022,8 +1021,7 @@ def single_pipe(
                 )
                 # INS chr pos len read_ID seq
     file.close()
-    reads_output = "%ssignatures/_%s_%d_%d.reads" % (
-        temp_dir,
+    reads_output = temp_dir/"signatures/_%s_%d_%d.reads" % (
         Chr_name,
         task[1],
         task[2],
@@ -1055,46 +1053,31 @@ def error_handler(exc):
     raise exc
 
 
-def temp_dir_empty(temporary_dir: str) -> bool:
-    """Check if temporary directory is finished or needs update
-
-    Args:
-        temporary_dir (Path): Used work dir
-
-    Returns:
-        bool: True if any necessary file in the workdir is empty or missing
-    """
-    temporary_dir = Path(temporary_dir)
-    for kind in ["DEL", "DUP", "INS", "INV", "TRA", "reads"]:
-        f = temporary_dir / f"{kind}.sigs"
-        try:
-            if f.stat().st_size == 0:
-                return True
-        except FileNotFoundError:
-            return True
-    return False
 
 
+    
+    
 def main_ctrl(args, argv):
     if not os.path.isfile(args.reference):
         raise FileNotFoundError("[Errno 2] No such file: '%s'" % args.reference)
-    temporary_dir = Path(args.work_dir)
-    if not temporary_dir.is_dir:
-        raise FileNotFoundError("[Errno 2] No such directory: '%s'" % args.work_dir)
+    temporary_dir=WorkDir(args.work_dir)
+
     # Apologise about the following line. I just can't fix all the silly directory handling here.
-    temporary_dir = str(temporary_dir) + "/"
+    
 
-    contigINFO,read_group_name = process_bam_file(args, temporary_dir, temp_dir_empty(temporary_dir))
+    contigINFO,read_group_name = process_bam_file(args, temporary_dir.path, temporary_dir.temp_dir_empty())
 
     #'''
     #'''
-    if temp_dir_empty(temporary_dir):
+    if temporary_dir.temp_dir_empty():
         logging.info("Rebuilding signatures of structural variants.")
-        merge_signatures(args, temporary_dir)
+        merge_signatures(args, temporary_dir.path)
     else:
         args.retain_work_dir = True
-        logging.info("Using signatures of structural variants from %s.", temporary_dir)
+        logging.info("Using signatures of structural variants from %s.", temporary_dir.path)
     #'''
+    
+    
     result = list()
 
     if args.Ivcf != None:
@@ -1105,7 +1088,7 @@ def main_ctrl(args, argv):
         result = force_call_genotypes(args, temporary_dir)
 
     else:
-        valuable_chr = load_valuable_chr(temporary_dir)
+        valuable_chr = temporary_dir.load_valuable_chr()
 
         logging.info("Clustering structural variants.")
         analysis_pools = Pool(processes=int(args.threads))
@@ -1283,7 +1266,7 @@ def force_call_genotypes(args, temporary_dir):
     return result
 
 
-def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
+def process_bam_file(args, temporary_dir: Path, update_temp_data: bool = True):
     samfile = pysam.AlignmentFile(args.input)
     contig_num = len(samfile.get_index_statistics())
     logging.info("The total number of chromosomes: %d" % (contig_num))
@@ -1320,10 +1303,10 @@ def process_bam_file(args, temporary_dir: str, update_temp_data: bool = True):
     return (contigINFO,read_group_name)
 
 
-def process_alignments(args, temporary_dir, Task_list, bed_regions):
+def process_alignments(args, temporary_dir:Path, Task_list, bed_regions):
     from pathlib import Path
 
-    signatures_path = Path(temporary_dir) / "signatures/"
+    signatures_path = temporary_dir / "signatures/"
     signatures_path.mkdir(parents=True, exist_ok=True)
     logging.info("Signature path '%s'.", str(signatures_path))
 
@@ -1352,7 +1335,8 @@ def process_alignments(args, temporary_dir, Task_list, bed_regions):
     analysis_pools.join()
 
 
-def merge_signatures(args, temporary_dir):
+def merge_signatures(args, temporary_dir:Path):
+    temporary_dir=str(temporary_dir)+"/"
     cmd_del = (
         "cat %ssignatures/*.bed | grep -w DEL | sort -u -T %s | sort -k 2,2 -k 3,3n -T %s > %sDEL.sigs"
         % (temporary_dir, temporary_dir, temporary_dir, temporary_dir)

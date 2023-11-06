@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, List, Tuple, Union
-from cuteSV.Description import Generation_VCF_header
+from cuteSV.Description import Generation_VCF_header, WorkDir
 from math import log10
 import numpy as np
 from collections import namedtuple
@@ -141,7 +141,7 @@ def count_coverage(chr, s, e, f, read_count, up_bound, itround):
     return status
 
 
-def load_reads(temporary_dir: str, chr: str) -> List[ChrReadInfo]:
+def load_reads(temporary_dir: WorkDir, chr: str) -> List[ChrReadInfo]:
     """Read the reads.sigs file from work directory
 
     Args:
@@ -152,14 +152,15 @@ def load_reads(temporary_dir: str, chr: str) -> List[ChrReadInfo]:
         List[ChrReadInfo]: List of used reads in given chromosome
     """
     reads_list = list()  # [(10000, 10468, 0, 'm54238_180901_011437/52298335/ccs'), ...]
-    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
-    for line in readsfile:
-        seq = line.strip().split("\t")
-        if seq[0] != chr:
-            continue
-        reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-        # reads_list.append((int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-    readsfile.close()
+    reads_path = temporary_dir.path / "reads.sigs"
+    with reads_path.open("r") as readsfile:
+        for line in readsfile:
+            seq = line.strip().split("\t")
+            if seq[0] != chr:
+                continue
+            reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
+
+
     return reads_list
 
 
@@ -817,48 +818,6 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
                 )
             )
 
-
-def load_valuable_chr(path: str) -> Dict[str, Union[List[str], Dict[str, List[str]]]]:
-    """Load a dictionary of signature types to list (or dict of lists) containing the chromosome
-    names with that type of signatures.
-
-    Args:
-        path (str): The temporary work path for the signature files
-
-    Returns:
-        Dict[str,Union[List[str],Dict[str,List[str]]]]: From signature type to list of chromosome names.
-    """
-    valuable_chr = dict()
-    valuable_chr["DEL"] = list()
-    valuable_chr["DUP"] = list()
-    valuable_chr["INS"] = list()
-    valuable_chr["INV"] = list()
-    valuable_chr["TRA"] = dict()
-
-    for svtype in ["DEL", "DUP", "INS", "INV"]:
-        file = open("%s%s.sigs" % (path, svtype), "r")
-        for line in file:
-            chr = line.strip("\n").split("\t")[1]
-            if chr not in valuable_chr[svtype]:
-                valuable_chr[svtype].append(chr)
-        file.close()
-        valuable_chr[svtype].sort()
-
-    file = open("%s%s.sigs" % (path, "TRA"), "r")
-    for line in file:
-        chr1 = line.strip("\n").split("\t")[1]
-        chr2 = line.strip("\n").split("\t")[4]
-
-        if chr1 not in valuable_chr["TRA"]:
-            valuable_chr["TRA"][chr1] = list()
-        if chr2 not in valuable_chr["TRA"][chr1]:
-            valuable_chr["TRA"][chr1].append(chr2)
-
-    file.close()
-    for chr1 in valuable_chr["TRA"]:
-        valuable_chr["TRA"][chr1].sort()
-
-    return valuable_chr
 
 
 def load_bed(bed_file, Task_list):

@@ -2,7 +2,7 @@ from collections import namedtuple
 from typing import List
 import numpy as np
 from cuteSV.genotype import cal_CI, load_reads, overlap_cover, assign_gt, ChrReadInfo
-from cuteSV.Description import setupLogging
+from cuteSV.Description import WorkDir, setupLogging
 import logging
 
 # TODO:1. Identify DP with samfile pointer;
@@ -11,7 +11,7 @@ import logging
 
 
 def resolution_DEL(
-    path,
+    path:WorkDir,
     chr,
     svtype,
     read_count,
@@ -54,8 +54,9 @@ def resolution_DEL(
     candidate_single_SV = list()
 
     logging.debug("Reading DEL signatures from files.")
-    file = open("%s%s.sigs" % (path, "DEL"), "r")
-    for line in file:
+    #file = open("%s%s.sigs" % (path, "DEL"), "r")
+    #for line in file:
+    for line in path.lines("DEL",chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
             continue
@@ -108,7 +109,7 @@ def resolution_DEL(
                 gt_round,
                 remain_reads_ratio,
             )
-    file.close()
+    
     if action:
         candidate_single_SV_gt = call_gt(
             path, chr, candidate_single_SV, max_cluster_bias, "DEL"
@@ -267,7 +268,7 @@ def generate_del_cluster(
 
 
 def resolution_INS(
-    path,
+    path:WorkDir,
     chr,
     svtype,
     read_count,
@@ -310,10 +311,12 @@ def resolution_INS(
     semi_ins_cluster.append([0, 0, "", ""])
     candidate_single_SV = list()
 
-    file = open("%s%s.sigs" % (path, "INS"), "r")
-    for line in file:
+    #file = open("%s%s.sigs" % (path, "INS"), "r")
+    #for line in file:
+    for line in path.lines("INS",chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
+            logging.warning("Shouldn't have got %s",str(seq))
             continue
 
         pos = int(seq[2])
@@ -368,7 +371,7 @@ def resolution_INS(
                 gt_round,
                 remain_reads_ratio,
             )
-    file.close()
+    
     if action:
         candidate_single_SV_gt = call_gt(
             path, chr, candidate_single_SV, 1000, "INS"

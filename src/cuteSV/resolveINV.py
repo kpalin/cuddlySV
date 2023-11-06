@@ -1,10 +1,11 @@
 import numpy as np
 import logging
+from cuteSV.Description import WorkDir
 from cuteSV.genotype import load_reads, overlap_cover, assign_gt
 
 
 def resolution_INV(
-    path,
+    path:WorkDir,
     chr,
     svtype,
     read_count,
@@ -46,8 +47,9 @@ def resolution_INV(
     candidate_single_SV = list()
 
     # Load inputs & cluster breakpoint from each signature read
-    file = open("%s%s.sigs" % (path, "INV"), "r")
-    for line in file:
+    #file = open("%s%s.sigs" % (path, "INV"), "r")
+    #for line in file:
+    for line in path.lines("INV",chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
             continue
@@ -113,7 +115,6 @@ def resolution_INV(
                 MaxSize,
                 gt_round,
             )
-    file.close()
     if action:
         candidate_single_SV_gt = call_gt_inv(
             path, chr, candidate_single_SV, max_cluster_bias

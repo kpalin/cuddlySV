@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+from cuteSV.Description import WorkDir
 from cuteSV.genotype import cal_GL, threshold_ref_count, count_coverage
 
 """
@@ -28,7 +29,7 @@ from cuteSV.genotype import cal_GL, threshold_ref_count, count_coverage
 
 
 def resolution_TRA(
-    path,
+    path:WorkDir,
     chr_1,
     chr_2,
     read_count,
@@ -41,9 +42,10 @@ def resolution_TRA(
     semi_tra_cluster = list()
     semi_tra_cluster.append([0, 0, "", "N"])
     candidate_single_SV = list()
-    logging.info("Update A")
-    file = open("%s%s.sigs" % (path, "TRA"), "r")
-    for line in file:
+    #logging.info("Update A")
+    #file = open("%s%s.sigs" % (path, "TRA"), "r")
+    #for line in file:
+    for line in path.lines("TRA",chr_1,chr_2):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr_1:
             continue
@@ -100,7 +102,6 @@ def resolution_TRA(
                 action,
                 gt_round,
             )
-    file.close()
     logging.info("Finished %s-%s:%s." % (chr_1, chr_2, "TRA/BND"))
     return candidate_single_SV
 
