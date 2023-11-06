@@ -16,7 +16,7 @@ setup(
     packages=["cuteSV"],
     package_dir={"": "src/"},
     package_data={"": ["LICENSE"]},
-    scripts=["src/cuteSV/cuteSV"],
+    scripts=["src/cuteSV/cuteSV","src/somatic/merge_work_dirs.sh","src/somatic/add_mapping_tags.py"],
     # long_description = LONG_DESCRIPTION,
     long_description=readme,
     long_description_content_type="text/markdown",

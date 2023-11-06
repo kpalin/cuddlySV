@@ -3,5 +3,8 @@
     "tumor_alignment": "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006T1_19_1460/align/My_5006T1_19_1460.phased.raw.cram",
     "reference_fasta": "/mnt/cg8/reference-genomes/chm13v2.0_maskedY_rCRS/chm13v2.0_maskedY_rCRS.fa",
     "tumor_work_dir": "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006T1_19_1460/sv/cutesv_wrk_My_5006T1_19_1460.phased.raw/",
-    "normal_work_dir": "/home/kpalin/software/ONT_hg_somatic/cuteSV/src/somatic/panel_of_normals_105_most/"
+    "normal_work_dir": [
+        "/home/kpalin/software/ONT_hg_somatic/cuteSV/src/somatic/panel_of_normals_105_most/",
+        "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006N_19_1461/sv/cutesv_wrk_My_5006N_19_1461.phased.raw/"
+    ]
 }

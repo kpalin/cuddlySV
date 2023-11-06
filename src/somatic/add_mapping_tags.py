@@ -98,11 +98,14 @@ def split_contig_regions(chromosome_lengths, max_region_length) -> List[ContigSp
 
 def _add_MQ_header_info(vcf_file: pysam.VariantFile) -> pysam.VariantHeader:
     # Create a new header with INFO records for MQ and MQ0
+    import sys 
     new_header = vcf_file.header
     new_header.info.add("MQ", ".", "Float", "RMS Mapping Quality")
     new_header.info.add("MQ0", 1, "Integer", "Number of reads with mapping quality 0")
     new_header.info.add("DP", 1, "Integer", "Total read depth at variant.")
+    new_header.info.add("NORMAL_RE", 1, "Integer", "Number of read support this record in Normal samples")
     new_header.info.add("SOMATIC", 0, "Flag", "Somatic variant.")
+    new_header.add_meta("CommandLine"," ".join(sys.argv))
     new_header.filters.add(
         "MapQ0", None, None, r"MappingQ zero reads more than 10% of variant reads"
     )
@@ -217,12 +220,15 @@ def call_somatic(
     import re
 
     rnames = record.info.get("RNAMES", list())
-    read_sources = [rname.split(":")[-1] for rname in rnames]
+    read_parts = [rname.split(":") for rname in rnames]
+    
     tumor_rname_re = re.compile(tumor_rname)
 
     n_reads_total = len(rnames)
 
-    n_reads_tumor = sum(1 for rsrc in read_sources if tumor_rname_re.match(rsrc))
+    reads_tumor = [rname for rname,rsrc in read_parts if tumor_rname_re.match(rsrc)]
+    n_reads_tumor = len(reads_tumor)
+    
     n_reads_normal = n_reads_total - n_reads_tumor
 
     if n_reads_tumor > 0 and n_reads_normal == 0:
@@ -233,6 +239,10 @@ def call_somatic(
         return None
     else:
         raise ValueError(record.to_string())
+    
+    record.info["RE"] = n_reads_tumor
+    record.info["RNAMES"] = reads_tumor
+    record.info["NORMAL_RE"] = n_reads_normal
     return record
 
 

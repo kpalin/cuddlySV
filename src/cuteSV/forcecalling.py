@@ -602,16 +602,16 @@ def solve_fc(
     gt_round,
 ):
     reads_info = dict()  # [10000, 10468, 0, 'm54238_180901_011437/52298335/ccs']
-    readsfile = open("%sreads.sigs" % (temporary_dir), "r")
-    for line in readsfile:
-        seq = line.strip().split("\t")
-        chr = seq[0]
-        if chr not in chrom_list:
-            continue
-        if chr not in reads_info:
-            reads_info[chr] = list()
-        reads_info[chr].append([int(seq[1]), int(seq[2]), int(seq[3]), seq[4]])
-    readsfile.close()
+    reads_file_name = temporary_dir.path /"reads.sigs"
+    with reads_file_name.open( "r") as readsfile:
+        for line in readsfile:
+            seq = line.strip().split("\t")
+            chr = seq[0]
+            if chr not in chrom_list:
+                continue
+            if chr not in reads_info:
+                reads_info[chr] = list()
+            reads_info[chr].append([int(seq[1]), int(seq[2]), int(seq[3]), seq[4]])
 
     sv_dict = dict()
     for sv_type in ["DEL", "DUP", "INS", "INV", "TRA", "BND"]:
