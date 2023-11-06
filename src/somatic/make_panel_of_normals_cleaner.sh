@@ -18,11 +18,12 @@ usage() {
 $0 -o OUTPATH/ -i input.tsv
 
 -o OUTPATH/
--i input.tsv   Tab separated list of normal sample \"workdir/\\tcalls_with_RNAMES.vcf\"
+-i input.tsv   Tab separated list of normal sample \"workdir/\\\\tcalls_with_RNAMES.vcf\"
 -h          Show this message and exit." >&2
     exit 1
 
 }
+trap usage EXIT
 
 FIFTHofMEM=1G
 while getopts "o:hn:i:" flag; do

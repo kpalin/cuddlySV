@@ -1,7 +1,7 @@
 import numpy as np
 import logging
-from cuteSV.Description import WorkDir
-from cuteSV.genotype import cal_GL, threshold_ref_count, count_coverage
+from .Description import WorkDir
+from .genotype import cal_GL, threshold_ref_count, count_coverage
 
 """
 *******************************************

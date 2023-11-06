@@ -1,44 +1,104 @@
 # cuddlySV
 
-### Getting Start
+CuddlySV is a fork of [cuteSV](https://github.com/tjiangHIT/cuteSV/) with main added feature of somatic structural variant calling.
 
-                                                __________    __       __
-                                               |   ____   |  |  |     |  |
-                           _                   |  |    |__|  |  |     |  |
-  _______    __   ___| |___     ______    |  |          |  |     |  |
- |  ___|  | |   | | |___   ___|   / ____ \   |  |_______   |  |     |  |
- | |   |_|  | |   | |     | |      / /____\ \  |_______   |  |  |     |  |
- | |        | |   | |     | |      | _______|   __     |  |  \  \     /  /
- | |    _   | |   | |     | |  _   | |     _   |  |    |  |   \  \   /  /
- | |___| |  | |___| |     | |_| |  \ \____/ |  |  |____|  |    \  \_/  /
- |_______|  |_______|     |_____|   \______/   |__________|     \_____/
+Long-read sequencing enables the comprehensive discovery of structural variations (SVs). However, it is still non-trivial to achieve high sensitivity and performance simultaneously due to the complex SV characteristics implied by noisy long reads. [cuteSV](https://github.com/tjiangHIT/cuteSV/), a sensitive, fast and scalable long-read-based SV detection approach, uses tailored methods to collect the signatures of various types of SVs and employs a clustering-and-refinement method to analyze the signatures to implement sensitive SV detection. Benchmarks on real Pacific Biosciences (PacBio) and Oxford Nanopore Technology (ONT) datasets demonstrate that cuteSV has better yields and scalability than state-of-the-art tools.
+
+## Getting Start
 
 ---
 
 ### Installation
 
- git clone --branch somatic <https://github.com/kpalin/cuteSV.git> && cd cuteSV/ && pip install .
+```console
+git clone --branch somatic https://github.com/kpalin/cuddlySV.git && cd cuddlySV/ && pip install .
+```
 
 Note the '.' at the end.
 
----
+### Germline/single sample variant calling
 
-### Introduction
+For whole genome ONT data one can call germline variants with command like:
 
-Long-read sequencing enables the comprehensive discovery of structural variations (SVs). However, it is still non-trivial to achieve high sensitivity and performance simultaneously due to the complex SV characteristics implied by noisy long reads. Therefore, we propose cuteSV, a sensitive, fast and scalable long-read-based SV detection approach. cuteSV uses tailored methods to collect the signatures of various types of SVs and employs a clustering-and-refinement method to analyze the signatures to implement sensitive SV detection. Benchmarks on real Pacific Biosciences (PacBio) and Oxford Nanopore Technology (ONT) datasets demonstrate that cuteSV has better yields and scalability than state-of-the-art tools.
+```console
+cuddlySV align/My_6217T1_19_1456.phased.raw.cram chm13v2.0_maskedY_rCRS.fa \
+  sv/My_6217T1_19_1456.phased.raw.cuddlysv.vcf \
+  sv/cuddlysv_wrk_My_6217T1_19_1456.phased.raw \
+  --sample My_6217T1_19_1456 \
+  --threads 10 --min_support 3 \
+  --genotype --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 \
+  --min_size 10 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 \
+  --report_readid --max_size -1  --retain_work_dir 
+```
 
-The benchmark results of cuteSV on the HG002 human sample are below:
+For tumor samples user should make sure using `--max_size -1` to get also large variants, e.g. whole chromosome arm events.  For somatic calling, one needs to `--retain_work_dir`.
 
-<img src="hg2_assessments.png" width="800px">
+### Somatic calling
 
-BTW, we used [Truvari](https://github.com/spiralgenetics/truvari) to calculate the recall, precision, and f-measure.
-For more detailed implementation of SV benchmarks, we show an example [here](https://github.com/tjiangHIT/sv-benchmark).
+The somatic calling with cuddlySV proceeds in multiple steps
 
-## Notice
+ 1. Single sample calling for each tumor and normal, retaining the work directory
+ 2. Creating panel of normals by merging the normal sample SV signatures
+ 3. Merging the normal and tumor signatures
+ 4. SV calling proper
+ 5. Filtering for somatic variants
 
-A new wiki page about diploid-assembly-based SV detection using cuteSV has been established. More details please see [here](https://github.com/tjiangHIT/cuteSV/wiki/Diploid-assembly-based-SV-detection-using-cuteSV).
+For somatic calling we need work directories from prior single sample runs for either matched normals or pool of normals if the matching sample is not available.  The single sample runs are performed as described above in "Germline/single sample variant calling".  
 
-We provided a new document for applying __force calling__ (or __regenotyping__) benchmark [here](https://github.com/tjiangHIT/cuteSV/tree/master/src/documentation).
+For somatic calling, the input cram/bam files must have readgroup information attached to the reads and must contain exactly one readgroup!
+
+#### Creating panel of normals
+
+For making a pool of (non matching) normals one needs a (tab separated) list of retained cuddlySV workdirs and output vcf files from the normal samples. When you have the file `list_of_normals.tsv`, containing the information, run command
+
+```console
+make_panel_of_normals_cleaner.sh -o panel_of_normals/ list_of_normals.tsv
+```
+
+This will include the signatures of all PASS:ing variants in any of the files to the `panel_of_normals/` directory.
+
+#### Merging normal and tumor signatures
+
+The tumor and at least one normal sample work directory must be merged with command
+
+```console
+merge_work_dirs.sh -o merged_wrk_dir/ -t sv/cuddlysv_wrk_My_6217T1_19_1456.phased.raw -n panel_of_normals/
+```
+
+This will merge all normal samples listed after `-n` option with the tumor given in `-t`. Multiple normals (e.g. panel of normals and a matching normal) can be included also at this point with difference to `make_panel_of_normals_cleaner.sh` being lack of filtering by `PASS` variants.
+
+#### SV calling proper
+
+We can use the merged work directory like the directory generated by single sample calling, e.g. with
+
+```console
+cuddlySV align/My_6217T1_19_1456.phased.raw.cram chm13v2.0_maskedY_rCRS.fa \
+  sv/joint.My_6217T1_19_1456.phased.raw.cuddlysv.vcf \
+  merged_wrk_dir/ \
+  --sample My_6217T1_19_1456 \
+  --threads 10 --min_support 3 \
+  --genotype --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 \
+  --min_size 10 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3 \
+  --report_readid --max_size -1  --retain_work_dir --report_readgroup
+```
+
+This command produces a temporary file `sv/joint.My_6217T1_19_1456.phased.raw.cuddlysv.vcf` which includes mixture of SV calls from normals and tumor alike and which needs to be further filtered. Notable from above command is `--report_readgroup` command needed to track the source samples for each called SV.
+
+#### Filter for somatic variants
+
+Finally we can distinguish the somatic and germline variants.
+
+```console
+python add_mapping_tags.py -v sv/joint.My_6217T1_19_1456.phased.raw.cuddlysv.vcf \
+  -a align/My_6217T1_19_1456.phased.raw.cram \
+  -o sv/joint.My_6217T1_19_1456.phased.raw.cuddlysv.somatic.vcf
+```
+
+This command will filter out variants that are not present in the tumor, add `SOMATIC` tag for variants present only in the tumor, `NORMAL_RE` for number of reads (signatures) in the normals supporting this variant (only for germline), `DP`, `MQ` and `MQ0` variants characterizing the region of the variant. It will also recalculated the variant quality add `MapQ0` filter for variants with more than 10% of overlapping reads having Mapping Quality zero.  The variant quality is recalculated assuming poisson sampling of 5% of variant reads.
+
+### Snakemake pipeline for somatic calling
+
+There is a Snakefile for pipelineing somatic variant calling in `https://github.com/kpalin/cuddlySV/tree/somatic`. The configuration file is in `src/somatic/cuddly_somatic.json` and the Snakefile in `src/somatic/Snakefile`
 
 ---
 
@@ -46,16 +106,15 @@ We provided a new document for applying __force calling__ (or __regenotyping__) 
 
  1. python3
  2. pysam
- 3. Biopython
- 4. cigar
- 5. numpy
- 6. pyvcf
+ 3. cigar
+ 4. numpy
+ 5. pyfastx
 
 ---
 
 ### Usage
 
- cuteSV <sorted.bam> <reference.fa> <output.vcf> <work_dir>
+ cuddlySV <sorted.bam> <reference.fa> <output.vcf> <work_dir>
 
 *Suggestions*
 
@@ -98,39 +157,36 @@ We provided a new document for applying __force calling__ (or __regenotyping__) 
 |--gt_round|Maximum round of iteration for alignments searching if perform genotyping.|500|
 |-Ivcf|Optional given vcf file. Enable to perform force calling.|NULL|
 |--max_cluster_bias_INS|Maximum distance to cluster read together for insertion.|100|
-|--diff_ratio_merging_INS|Do not merge breakpoints with basepair identity more than the ratio of _default_ for insertion.|0.3|
+|--diff_ratio_merging_INS|Do not merge breakpoints with basepair identity more than the ratio of *default* for insertion.|0.3|
 |--max_cluster_bias_DEL|Maximum distance to cluster read together for deletion.|200|
-|--diff_ratio_merging_DEL|Do not merge breakpoints with basepair identity more than the ratio of _default_ for deletion.|0.5|
+|--diff_ratio_merging_DEL|Do not merge breakpoints with basepair identity more than the ratio of *default* for deletion.|0.5|
 |--max_cluster_bias_INV|Maximum distance to cluster read together for inversion.|500|
 |--max_cluster_bias_DUP|Maximum distance to cluster read together for duplication.|500|
 |--max_cluster_bias_TRA|Maximum distance to cluster read together for translocation.|50|
-|--diff_ratio_filtering_TRA|Filter breakpoints with basepair identity less than the ratio of _default_ for translocation.|0.6|
+|--diff_ratio_filtering_TRA|Filter breakpoints with basepair identity less than the ratio of *default* for translocation.|0.6|
 |--remain_reads_ratio|The ratio of reads remained in cluster to generate the breakpoint. Set lower to get more precise breakpoint when the alignment data have high quality but recommand over 0.5.|1|
 |-include_bed|Optional given bed file. Only detect SVs in regions in the BED file.|NULL|
+|--report_readgroup|Append readgroup id to reported read names. Necessary for downstream somatic calling.|False|
 
 ---
-
-### Datasets generated from cuteSV
-
-We provided the SV callsets of the HG002 human sample produced by cuteSV form three different long-read sequencing platforms (i.e. PacBio CLR, PacBio CCS, and ONT PromethION).
-
-You can download them at:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3783083.svg)](https://doi.org/10.5281/zenodo.3783083)
-
-Please cite the manuscript of cuteSV before using these callsets.
 
 ---
 
 ### Changelog
 
- cuteSV (v3.0.0)
+ cuddlySV (v3.0.0)
+
+  This is first version of cuddlySV, a significant update of
+  [cuteSV](https://github.com/tjiangHIT/cuteSV/).  There are several changes resulting in output
+  different from cuteSV:
 
  1. Skip supplementary alignments mostly overlapping primary in opposite strand. In ONT data these
     are likely two strands of the same molecule sequenced in same read.
  2. Continue work from previously retained workdir.
- 3. Add readgroup from alignment file to the read names.
+ 3. Option to add readgroup from alignment file to the read names.
  4. Reported position is median (not mean) of the read signal positions
  5. CIPOS and CILEN report the minimum-maximum span around POS and SVLEN (not 95% Gaussian confidence interval.)
+ 6. Post processing scripts for somatic calling using either matched normal or panel of normals control.
 
  cuteSV (v2.0.3):
 
@@ -258,4 +314,4 @@ Cao S et al. Re-genotyping structural variants through an accurate force-calling
 
 ### Contact
 
-For advising, bug reporting and requiring help, please post on [Github Issue](https://github.com/tjiangHIT/cuteSV/issues) or contact <tjiang@hit.edu.cn>.
+For advising, bug reporting and requiring help, please post on [Github Issue](https://github.com/kpalin/cuddlySV/issues).

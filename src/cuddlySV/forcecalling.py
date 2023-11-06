@@ -1,5 +1,5 @@
 from typing import Iterable
-from cuteSV.genotype import cal_CI, overlap_cover, assign_gt
+from .genotype import cal_CI, overlap_cover, assign_gt
 from multiprocessing import Pool
 from pysam import VariantFile, VariantRecord
 import math

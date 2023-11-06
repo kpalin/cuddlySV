@@ -1,6 +1,6 @@
 from collections import namedtuple
 from typing import List
-from cuteSV.cuddlySV import acquire_clip_pos
+from .cuddlySV import acquire_clip_pos
 
 SplitRead = namedtuple(
     "SplitRead", ["read_start", "read_end", "ref_start", "ref_end", "chrom", "strand"]

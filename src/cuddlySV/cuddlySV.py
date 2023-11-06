@@ -5,21 +5,21 @@ from typing import Any, List
 import pysam
 import cigar
 import pyfastx
-from cuteSV.Description import WorkDir, parseArgs, setupLogging
+from .Description import WorkDir, parseArgs, setupLogging
 from multiprocessing import Pool
-from cuteSV.CommandRunner import *
+from .CommandRunner import *
 
 # from resolution_type import *
-from cuteSV.resolveINV import run_inv
-from cuteSV.resolveTRA import run_tra
-from cuteSV.resolveINDEL import run_ins, run_del
-from cuteSV.resolveDUP import run_dup
-from cuteSV.genotype import (
+from .resolveINV import run_inv
+from .resolveTRA import run_tra
+from .resolveINDEL import run_ins, run_del
+from .resolveDUP import run_dup
+from .genotype import (
     generate_output,
     generate_pvcf,
     load_bed,
 )
-from cuteSV.forcecalling import force_calling_chrom
+from .forcecalling import force_calling_chrom
 import os
 import argparse
 import logging
@@ -659,7 +659,7 @@ def acquire_clip_pos(deal_cigar):
     return [first_pos, last_pos, ref_span]
 
 
-from cuteSV.split_signal import organize_split_signal
+from .split_signal import organize_split_signal
 
 
 def _organize_split_signal(

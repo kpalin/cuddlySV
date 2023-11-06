@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, List, Tuple, Union
-from cuteSV.Description import Generation_VCF_header, WorkDir
+from .Description import Generation_VCF_header, WorkDir
 from math import log10
 import numpy as np
 from collections import namedtuple
@@ -486,7 +486,7 @@ def output_INV(args, ref_g, svid, file, action, variant):
     svid[variant[1]] += 1
 
 
-from cuteSV.resolveDUP import DuplicationSV
+from .resolveDUP import DuplicationSV
 
 
 def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):

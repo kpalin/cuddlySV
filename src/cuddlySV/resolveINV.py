@@ -1,7 +1,7 @@
 import numpy as np
 import logging
-from cuteSV.Description import WorkDir
-from cuteSV.genotype import load_reads, overlap_cover, assign_gt
+from .Description import WorkDir
+from .genotype import load_reads, overlap_cover, assign_gt
 
 
 def resolution_INV(

@@ -6,17 +6,18 @@ with open("README.md") as f:
     readme = f.read()
 
 setup(
-    name="cuteSV",
+    name="cuddlySV",
     version="3.0.0",
-    description="Long-read-based human genomic structural variation detection with cuteSV",
-    author="Jiang Tao",
-    author_email="tjiang@hit.edu.cn",
-    url="https://github.com/tjiangHIT/cuteSV",
+    description="Long-read-based human genomic (somatic) structural variation detection",
+    author="Jiang Tao, Kimmo Palin",
+    url="https://github.com/kpalin/cuddlySV",
     license="MIT",
-    packages=["cuteSV"],
+    packages=["cuddlySV"],
     package_dir={"": "src/"},
     package_data={"": ["LICENSE"]},
-    scripts=["src/cuteSV/cuteSV","src/somatic/merge_work_dirs.sh","src/somatic/add_mapping_tags.py"],
+    scripts=["src/cuddlySV/cuddlySV","src/somatic/merge_work_dirs.sh",
+            "src/somatic/add_mapping_tags.py",
+            "src/somatic/make_panel_of_normals_cleaner.sh"],
     # long_description = LONG_DESCRIPTION,
     long_description=readme,
     long_description_content_type="text/markdown",
@@ -24,7 +25,6 @@ setup(
     install_requires=[
         "pysam",
         "ncls",
-        "Biopython",
         "Cigar",
         "numpy",
         "pyfastx",

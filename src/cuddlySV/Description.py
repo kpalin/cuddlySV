@@ -9,7 +9,7 @@ else:
     import importlib_metadata as metadata
 
 
-VERSION = metadata.version("cuteSV")
+VERSION = metadata.version("cuddlySV")
 
 from pathlib import Path
 
@@ -150,16 +150,16 @@ class WorkDir:
         return idxs
     
 
-class cuteSVdp(object):
+class cuddlySVdp(object):
     """
-    Detailed descriptions of cuteSV version and its parameters.
+    Detailed descriptions of cuddlySV version and its parameters.
     """
 
     USAGE = """\
 		
 	Current version: v%s
-	Author: Tao Jiang
-	Contact: tjiang@hit.edu.cn
+	Author: Tao Jiang, Kimmo Palin
+	Contact: tjiang@hit.edu.cn (or google for Kimmo Palin)
 
 	If you use cuteSV in your work, please cite:
 		Jiang T et al. Long-read-based human genomic structural variation detection with cuteSV. 
@@ -196,8 +196,8 @@ class cuteSVdp(object):
 
 def parseArgs(argv):
     parser = argparse.ArgumentParser(
-        prog="cuteSV",
-        description=cuteSVdp.USAGE,
+        prog="cuddlySV",
+        description=cuddlySVdp.USAGE,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -477,7 +477,7 @@ def parseArgs(argv):
 def Generation_VCF_header(file, contiginfo, sample, argv):
     # General header
     file.write("##fileformat=VCFv4.2\n")
-    file.write("##source=cuteSV-%s\n" % (VERSION))
+    file.write("##source=cuddlySV-%s\n" % (VERSION))
     import time
 
     file.write(
@@ -551,7 +551,7 @@ def Generation_VCF_header(file, contiginfo, sample, argv):
         '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="# Genotype quality">\n'
     )
 
-    file.write('##CommandLine="cuteSV %s"\n' % (" ".join(argv)))
+    file.write('##CommandLine="cuddlySV %s"\n' % (" ".join(argv)))
 
 
 def setupLogging(debug=False):

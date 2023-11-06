@@ -11,7 +11,7 @@ rule somatic_filter:
         "{tumor}.cuddlysv.somatic.vcf.gz",
     output:
         vcf="{tumor}.cuddlysv.somatic.filtered.vcf.gz",
-        idx="{tumor}.cuddlysv.somatic.filtered.vcf.gz.tbi",
+        idx="{tumor}.cuddlysv.somatic.filtered.vcf.gz.csi",
     shell:
         "bcftools view --write-index -o {output.vcf} -i 'SOMATIC=1' -f PASS {input}"
 

@@ -3,8 +3,8 @@ from collections import namedtuple
 from typing import List
 import numpy as np
 import logging
-from cuteSV.Description import WorkDir
-from cuteSV.genotype import cal_CI, load_reads, overlap_cover, assign_gt
+from .Description import WorkDir
+from .genotype import cal_CI, load_reads, overlap_cover, assign_gt
 
 # TODO: 1. Identify DP with samfile pointer;
 # TODO: 2. Add CIPOS, CILEN and/or CIEND;
