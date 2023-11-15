@@ -11,8 +11,9 @@ from argparse import Namespace
 import logging
 from os import EX_OK
 import sys
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 import pysam
+from collections import namedtuple
 
 
 def parse_args(args: List[str]) -> Namespace:
@@ -45,6 +46,13 @@ def parse_args(args: List[str]) -> Namespace:
         default=7,
         type=int,
     )
+    parser.add_argument(
+        "-s",
+        "--min_support",
+        help="Minimum number of supporting reads required [default:%(default)s]",
+        default=3,
+        type=int,
+    )
     version = f"%(prog)s {__version__}"
     parser.add_argument("--version", action="version", version=version)
 
@@ -68,8 +76,6 @@ def parse_args(args: List[str]) -> Namespace:
 
     return args
 
-
-from collections import namedtuple
 
 ContigSplit = namedtuple("ContigSplit", ("CHROM", "START", "END"))
 
@@ -98,17 +104,31 @@ def split_contig_regions(chromosome_lengths, max_region_length) -> List[ContigSp
 
 def _add_MQ_header_info(vcf_file: pysam.VariantFile) -> pysam.VariantHeader:
     # Create a new header with INFO records for MQ and MQ0
-    import sys 
+    import sys
+
     new_header = vcf_file.header
-    new_header.info.add("MQ", ".", "Float", "RMS Mapping Quality")
-    new_header.info.add("MQ0", 1, "Integer", "Number of reads with mapping quality 0")
-    new_header.info.add("DP", 1, "Integer", "Total read depth at variant.")
-    new_header.info.add("NORMAL_RE", 1, "Integer", "Number of read support this record in Normal samples")
-    new_header.info.add("SOMATIC", 0, "Flag", "Somatic variant.")
-    new_header.add_meta("CommandLine"," ".join(sys.argv))
-    new_header.filters.add(
-        "MapQ0", None, None, r"MappingQ zero reads more than 10% of variant reads"
-    )
+    if "MQ" not in new_header.info:
+        new_header.info.add("MQ", ".", "Float", "RMS Mapping Quality")
+    if "MQ0" not in new_header.info:
+        new_header.info.add(
+            "MQ0", 1, "Integer", "Number of reads with mapping quality 0"
+        )
+    if "DP" not in new_header.info:
+        new_header.info.add("DP", 1, "Integer", "Total read depth at variant.")
+    if "NORMAL_RE" not in new_header.info:
+        new_header.info.add(
+            "NORMAL_RE",
+            1,
+            "Integer",
+            "Number of read support this record in Normal samples",
+        )
+    if "SOMATIC" not in new_header.info:
+        new_header.info.add("SOMATIC", 0, "Flag", "Somatic variant.")
+    new_header.add_meta("CommandLine", " ".join(sys.argv))
+    if "MapQ0" not in new_header.filters:
+        new_header.filters.add(
+            "MapQ0", None, None, r"MappingQ zero reads more than 10% of variant reads"
+        )
     return new_header
 
 
@@ -141,9 +161,8 @@ def main(argv: List[str] = sys.argv[1:]) -> int:
     # Open the output VCF file for writing with the updated header
     vcf_writer = pysam.VariantFile(output_vcf, "w", header=new_header)
 
-    from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor
     from functools import partial
-    import itertools as it
     import logging
 
     assert (
@@ -153,7 +172,9 @@ def main(argv: List[str] = sys.argv[1:]) -> int:
     read_group = get_read_group(input_bam)
 
     with ThreadPoolExecutor(n_threads) as pool:
-        add_mq_chunk_part = partial(add_mq_chunk, input_bam, input_vcf, read_group)
+        add_mq_chunk_part = partial(
+            add_mq_chunk, input_bam, input_vcf, read_group, min_support=args.min_support
+        )
         out_records = pool.map(add_mq_chunk_part, chromosome_splits, chunksize=1)
         logging.info("Sent map")
         # for record in tqdm(it.chain.from_iterable(out_records)):
@@ -206,7 +227,9 @@ def call_precise(record: pysam.VariantRecord) -> pysam.VariantRecord:
 
 
 def call_somatic(
-    record: pysam.VariantRecord, tumor_rname: str
+    record: pysam.VariantRecord,
+    tumor_rname: str,
+    min_support: int = 0,
 ) -> Union[None, pysam.VariantRecord]:
     """Set SOMATIC flag if RNAMES contain only reads with tumor_rname.
 
@@ -221,25 +244,29 @@ def call_somatic(
 
     rnames = record.info.get("RNAMES", list())
     read_parts = [rname.split(":") for rname in rnames]
-    
+
     tumor_rname_re = re.compile(tumor_rname)
 
     n_reads_total = len(rnames)
 
-    reads_tumor = [rname for rname,rsrc in read_parts if tumor_rname_re.match(rsrc)]
+    reads_tumor = [rname for rname, rsrc in read_parts if tumor_rname_re.match(rsrc)]
     n_reads_tumor = len(reads_tumor)
-    
+
     n_reads_normal = n_reads_total - n_reads_tumor
 
-    if n_reads_tumor > 0 and n_reads_normal == 0:
-        record.info["SOMATIC"] = True
-    elif n_reads_tumor > 0 and n_reads_normal > 0:
-        record.info["SOMATIC"] = False
-    elif n_reads_tumor == 0 and n_reads_normal > 0:
+    re_m1 = max(0, min_support - 1)
+    if n_reads_tumor > re_m1:
+        if n_reads_normal == 0:
+            record.info["SOMATIC"] = True
+        elif n_reads_normal > 0:
+            record.info["SOMATIC"] = False
+        else:
+            raise ValueError(record.tostring())
+    elif 0 <= n_reads_tumor <= re_m1:
         return None
     else:
-        raise ValueError(record.to_string())
-    
+        raise ValueError(record.tostring())
+
     record.info["RE"] = n_reads_tumor
     record.info["RNAMES"] = reads_tumor
     record.info["NORMAL_RE"] = n_reads_normal
@@ -298,7 +325,7 @@ def call_filters(record: pysam.VariantRecord, tumor_name: str) -> pysam.VariantR
         record.filter.add("q5")
 
     DepthVariant = record.samples[tumor_name].get("DV", 1)
-    if record.info["MQ0"] >= 0.1 * DepthVariant:
+    if record.info.get("MQ0", DepthVariant) >= 0.1 * DepthVariant:
         record.filter.add("MapQ0")
     if len(record.filter) == 0:
         record.filter.add("PASS")
@@ -359,11 +386,16 @@ class BamMapqFetcher:
         return mapqs
 
 
-def add_mq_chunk(input_bam, input_vcf, read_group: str, csplit: Tuple[str, int, int]):
+def add_mq_chunk(
+    input_bam,
+    input_vcf,
+    read_group: str,
+    csplit: Tuple[str, int, int],
+    min_support: int = 0,
+):
     import pysam
     import logging
     import time
-    import itertools as it
 
     start_time = time.time()
 
@@ -384,7 +416,7 @@ def add_mq_chunk(input_bam, input_vcf, read_group: str, csplit: Tuple[str, int, 
         # Fetch reads at the location of the record from the BAM file
         if record.pos < csplit.START or record.pos >= csplit.END:
             continue
-        record = call_somatic(record, read_group)
+        record = call_somatic(record, read_group, min_support)
         if not record:
             continue
 
@@ -398,9 +430,11 @@ def add_mq_chunk(input_bam, input_vcf, read_group: str, csplit: Tuple[str, int, 
         if record.info.get("SVTYPE", None) == "BND":
             m = re.match(r"[a-zA-Z]*[][]([^:]+):(\d+)[][][a-zA-Z]*", record.alts[0])
             if m is None:
-                raise ValueError(
+                logging.warning(
                     "Weird thing with alt of %s : %s" % (record.id, record.alts[0])
                 )
+                out_records.append(record)
+                continue
             else:
                 end_contig, end_pos = m.groups()
                 end_pos = int(end_pos) - 1  # Zero based
@@ -435,15 +469,19 @@ def add_mq_chunk(input_bam, input_vcf, read_group: str, csplit: Tuple[str, int, 
             # mapping_qualities = {
             #     read.query_name: read.mapping_quality for read in reads
             # }
-            min_start, max_start = max(0, start_pos + ci_pos[0]), min(
-                contig_len - 1, start_pos + ci_pos[1]
+            min_start, max_start = (
+                max(0, start_pos + ci_pos[0]),
+                min(contig_len - 1, start_pos + ci_pos[1]),
             )
             mapping_qualities = mapq_fetch.get_mapqs(min_start, max_start)
 
             # SV end mapping qualities
-            min_end, max_end = max(0, end_pos + ci_pos[0] + ci_len[0]), min(
-                bam.header.get_reference_length(end_contig) - 1,
-                end_pos + ci_pos[1] + ci_len[1],
+            min_end, max_end = (
+                max(0, end_pos + ci_pos[0] + ci_len[0]),
+                min(
+                    bam.header.get_reference_length(end_contig) - 1,
+                    end_pos + ci_pos[1] + ci_len[1],
+                ),
             )
             if (
                 end_contig != csplit.CHROM

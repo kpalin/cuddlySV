@@ -98,17 +98,47 @@ This command will filter out variants that are not present in the tumor, add `SO
 
 ### Snakemake pipeline for somatic calling
 
-There is a Snakefile for pipelineing somatic variant calling in `https://github.com/kpalin/cuddlySV/tree/somatic`. The configuration file is in `src/somatic/cuddly_somatic.json` and the Snakefile in `src/somatic/Snakefile`
+There is a Snakefile for pipelineing somatic variant calling in `https://github.com/kpalin/cuddlySV/tree/somatic`. The configuration file is in `[share/cuddlySV/cuddly_somatic.json](src/somatic/cuddly_somatic.json)` and the Snakefile in `[share/cuddlySV/somaticSV.smk](src/somatic/somaticSV.smk)`
+
+To run the pipeline, you should first create a configuration file for each tumor like
+
+```json
+{
+    "sample_name": "My_5006T1_19_1460",
+    "tumor_alignment": "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006T1_19_1460/align/My_5006T1_19_1460.phased.raw.cram",
+    "reference_fasta": "/mnt/cg8/reference-genomes/chm13v2.0_maskedY_rCRS/chm13v2.0_maskedY_rCRS.fa",
+    "tumor_work_dir": "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006T1_19_1460/sv/cutesv_wrk_My_5006T1_19_1460.phased.raw/",
+    "normal_work_dir": [
+        "/home/kpalin/software/ONT_hg_somatic/cuteSV/src/somatic/panel_of_normals_105_most/",
+        "/mnt/cgnano/projects/promethion/ont_pipe_remora/My_5006N_19_1461/sv/cutesv_wrk_My_5006N_19_1461.phased.raw/"
+    ]
+}
+```
+
+Now the pipeline producing somatic calls should be run with command below (having correct path for snakefile and the configfile)
+
+```console
+snakemake --snakefile share/cuddlySV/somaticSV.smk --configfile cuddly_somatic.json -c 20 
+```
 
 ---
 
 ### Dependence
 
- 1. python3
- 2. pysam
- 3. cigar
- 4. numpy
- 5. pyfastx
+For running cuddlySV, you need
+
+- python3
+- pysam
+- cigar
+- numpy
+- pyfastx
+
+ For somatic calling, in addition
+
+- snakemake
+- scipy
+- bcftools
+- htslib
 
 ---
 

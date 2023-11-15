@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 import pysam
 import cigar
 import pyfastx
 from .Description import WorkDir, parseArgs, setupLogging
 from multiprocessing import Pool
-from .CommandRunner import *
+from .CommandRunner import exe
+from .split_signal import organize_split_signal
 
 # from resolution_type import *
 from .resolveINV import run_inv
@@ -21,7 +22,6 @@ from .genotype import (
 )
 from .forcecalling import force_calling_chrom
 import os
-import argparse
 import logging
 import sys
 import time
@@ -34,7 +34,7 @@ def get_cigar_ref_length(cigar: str) -> int:
 
     cig_parts = re.findall(r"(\d+)(\D)", cigar)
 
-    consumed_ref = sum(int(l) for l, op in cig_parts if op in "MDN=X")
+    consumed_ref = sum(int(length) for length, op in cig_parts if op in "MDN=X")
 
     return consumed_ref
 
@@ -63,7 +63,7 @@ def is_1d2_read(aligned_segment: pysam.AlignedSegment, overlap_threshold=0.95) -
         sa_start = int(fields[1]) - 1  # to zero based like pysam
         sa_is_forward = 1 if fields[2] == "+" else 0
         sa_cigar = fields[3]
-        sa_mapq = int(fields[4])
+        _sa_mapq = int(fields[4])
 
         if sa_ref_name != ref_name:
             # Different contig
@@ -532,7 +532,7 @@ def analysis_split_read(
                         ele_1 = ele_2
                         ele_2 = ele_3
                         ele_3 = None
-                    if ele_3 == None or (ele_1[5] == ele_2[5] and ele_2[5] != ele_3[5]):
+                    if ele_3 is None or (ele_1[5] == ele_2[5] and ele_2[5] != ele_3[5]):
                         if ele_1[5] == "-":
                             ele_1 = [
                                 RLength - SP_list[a + 2][1],
@@ -627,8 +627,7 @@ def analysis_split_read(
                             read_name,
                             str(
                                 query[
-                                    ele_1[1]
-                                    + int(dis_ref / 2) : ele_2[0]
+                                    ele_1[1] + int(dis_ref / 2) : ele_2[0]
                                     - int(dis_ref / 2)
                                 ]
                             ),
@@ -639,84 +638,6 @@ def analysis_split_read(
 
                 if dis_ref <= -SV_size:
                     candidate.append([ele_2[2], ele_1[3], read_name, "DUP", ele_2[4]])
-
-
-def acquire_clip_pos(deal_cigar):
-    seq = list(cigar.Cigar(deal_cigar).items())
-    if seq[0][1] == "S":
-        first_pos = seq[0][0]
-    else:
-        first_pos = 0
-    if seq[-1][1] == "S":
-        last_pos = seq[-1][0]
-    else:
-        last_pos = 0
-
-    ref_span = 0
-    for i in seq:
-        if i[1] == "M" or i[1] == "D" or i[1] == "=" or i[1] == "X":
-            ref_span += i[0]
-    return [first_pos, last_pos, ref_span]
-
-
-from .split_signal import organize_split_signal
-
-
-def _organize_split_signal(
-    primary_info,
-    Supplementary_info,
-    total_L,
-    SV_size,
-    min_mapq,
-    max_split_parts,
-    read_name,
-    candidate,
-    MaxSize,
-    query,
-):
-    split_read = list()
-    if len(primary_info) > 0:
-        split_read.append(primary_info)
-        min_mapq = 0
-    for i in Supplementary_info:
-        seq = i.split(",")
-        local_chr = seq[0]
-        local_start = int(seq[1])
-        local_cigar = seq[3]
-        local_strand = seq[2]
-        local_mapq = int(seq[4])
-        if local_mapq >= min_mapq:
-            # if local_mapq >= 0:
-            local_set = acquire_clip_pos(local_cigar)
-            if local_strand == "+":
-                split_read.append(
-                    [
-                        local_set[0],
-                        total_L - local_set[1],
-                        local_start,
-                        local_start + local_set[2],
-                        local_chr,
-                        local_strand,
-                    ]
-                )
-            else:
-                try:
-                    split_read.append(
-                        [
-                            local_set[1],
-                            total_L - local_set[0],
-                            local_start,
-                            local_start + local_set[2],
-                            local_chr,
-                            local_strand,
-                        ]
-                    )
-                except:
-                    pass
-    if len(split_read) <= max_split_parts or max_split_parts == -1:
-        analysis_split_read(
-            split_read, SV_size, total_L, read_name, candidate, MaxSize, query
-        )
 
 
 def generate_combine_sigs(sigs, Chr_name, read_name, svtype, candidate, merge_dis):
@@ -842,8 +763,7 @@ def parse_read(
                             aligned.query_sequence[
                                 shift_ins_read
                                 - element[1]
-                                - hardclip_left : shift_ins_read
-                                - hardclip_left
+                                - hardclip_left : shift_ins_read - hardclip_left
                             ]
                         ),
                     ]
@@ -907,7 +827,7 @@ def parse_read(
                 SAtag = aligned.get_tag("SA")
             except KeyError:
                 SAtag = None
-            if not SAtag is None:
+            if SAtag is not None:
                 Supplementary_info = SAtag.split(";")[:-1]
                 organize_split_signal(
                     primary_info,
@@ -930,7 +850,7 @@ def single_pipe(
     min_mapq,
     max_split_parts,
     min_read_len,
-    temp_dir:Path,
+    temp_dir: Path,
     task,
     min_siglength,
     merge_del_threshold,
@@ -951,7 +871,7 @@ def single_pipe(
         pos_start = read.reference_start  # 0-based
         pos_end = read.reference_end
         in_bed = False
-        if bed_regions != None:
+        if bed_regions is not None:
             for bed_region in bed_regions:
                 if pos_end <= bed_region[0] or pos_start >= bed_region[1]:
                     continue
@@ -991,16 +911,19 @@ def single_pipe(
         logging.info("Skip %s:%d-%d." % (Chr_name, task[1], task[2]))
         return
 
-    output = temp_dir / "signatures/_%s_%d_%d.bed" % ( Chr_name, task[1], task[2])
+    output = temp_dir / "signatures/_%s_%d_%d.bed" % (Chr_name, task[1], task[2])
     file = open(output, "w")
     for ele in candidate:
         if len(ele) == 5:
-            assert ele[-2] in ("DUP","DEL",)
+            assert ele[-2] in (
+                "DUP",
+                "DEL",
+            )
             file.write(
                 "%s\t%s\t%d\t%d\t%s\n" % (ele[-2], ele[-1], ele[0], ele[1], ele[2])
             )
         elif len(ele) == 7:
-            assert ele[-2]=="TRA"
+            assert ele[-2] == "TRA"
             file.write(
                 "%s\t%s\t%s\t%d\t%s\t%d\t%s\n"
                 % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3], ele[4])
@@ -1011,20 +934,24 @@ def single_pipe(
                     "%s\t%s\t%s\t%d\t%d\t%s\n"
                     % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3])
                 )
-                assert ele[-2]=="INV"
+                assert ele[-2] == "INV"
                 # INV chr strand pos1 pos2 read_ID
             except:
-                assert ele[-2]=="INS"
+                assert ele[-2] == "INS"
                 file.write(
                     "%s\t%s\t%d\t%d\t%s\t%s\n"
                     % (ele[-2], ele[-1], ele[0], ele[1], ele[2], ele[3])
                 )
                 # INS chr pos len read_ID seq
     file.close()
-    reads_output = temp_dir/"signatures/_%s_%d_%d.reads" % (
-        Chr_name,
-        task[1],
-        task[2],
+    reads_output = (
+        temp_dir
+        / "signatures/_%s_%d_%d.reads"
+        % (
+            Chr_name,
+            task[1],
+            task[2],
+        )
     )
     reads_file = open(reads_output, "w")
     for ele in reads_info_list:
@@ -1040,7 +967,7 @@ def multi_run_wrapper(args):
     setupLogging(True)
     try:
         return single_pipe(*args)
-    except Exception as e:
+    except Exception:
         logging.exception("Exception while handing alignments!")
         raise
 
@@ -1053,19 +980,16 @@ def error_handler(exc):
     raise exc
 
 
-
-
-    
-    
 def main_ctrl(args, argv):
     if not os.path.isfile(args.reference):
         raise FileNotFoundError("[Errno 2] No such file: '%s'" % args.reference)
-    temporary_dir=WorkDir(args.work_dir)
+    temporary_dir = WorkDir(args.work_dir)
 
     # Apologise about the following line. I just can't fix all the silly directory handling here.
-    
 
-    contigINFO,read_group_name = process_bam_file(args, temporary_dir.path, temporary_dir.temp_dir_empty())
+    contigINFO, read_group_name = process_bam_file(
+        args, temporary_dir.path, temporary_dir.temp_dir_empty()
+    )
 
     #'''
     #'''
@@ -1074,13 +998,14 @@ def main_ctrl(args, argv):
         merge_signatures(args, temporary_dir.path)
     else:
         args.retain_work_dir = True
-        logging.info("Using signatures of structural variants from %s.", temporary_dir.path)
+        logging.info(
+            "Using signatures of structural variants from %s.", temporary_dir.path
+        )
     #'''
-    
-    
+
     result = list()
 
-    if args.Ivcf != None:
+    if args.Ivcf is not None:
         # force calling
         logging.warning(
             "Force calling does something very different from denovo calling!"
@@ -1097,16 +1022,16 @@ def main_ctrl(args, argv):
         for chr in valuable_chr["DEL"]:
             para = [
                 {
-                    "path":temporary_dir,
-                    "chr":chr,
-                    "svtype":"DEL",
-                    "read_count":args.min_support,
-                    "threshold_gloab":args.diff_ratio_merging_DEL,
-                    "max_cluster_bias":args.max_cluster_bias_DEL,
-                    "minimum_support_reads":min(args.min_support, 5),
-                    "bam_path":args.input,
-                    "action":args.genotype,
-                    "gt_round":args.gt_round,
+                    "path": temporary_dir,
+                    "chr": chr,
+                    "svtype": "DEL",
+                    "read_count": args.min_support,
+                    "threshold_gloab": args.diff_ratio_merging_DEL,
+                    "max_cluster_bias": args.max_cluster_bias_DEL,
+                    "minimum_support_reads": min(args.min_support, 5),
+                    "bam_path": args.input,
+                    "action": args.genotype,
+                    "gt_round": args.gt_round,
                     "remain_reads_ratio": args.remain_reads_ratio,
                 }
             ]
@@ -1116,16 +1041,16 @@ def main_ctrl(args, argv):
         for chr in valuable_chr["INS"]:
             para = [
                 {
-                    "path":temporary_dir,
-                    "chr":chr,
-                    "svtype":"INS",
-                    "read_count":args.min_support,
-                    "threshold_gloab":args.diff_ratio_merging_INS,
-                    "max_cluster_bias":args.max_cluster_bias_INS,
-                    "minimum_support_reads":min(args.min_support, 5),
-                    "bam_path":args.input,
-                    "action":args.genotype,
-                    "gt_round":args.gt_round,
+                    "path": temporary_dir,
+                    "chr": chr,
+                    "svtype": "INS",
+                    "read_count": args.min_support,
+                    "threshold_gloab": args.diff_ratio_merging_INS,
+                    "max_cluster_bias": args.max_cluster_bias_INS,
+                    "minimum_support_reads": min(args.min_support, 5),
+                    "bam_path": args.input,
+                    "action": args.genotype,
+                    "gt_round": args.gt_round,
                     "remain_reads_ratio": args.remain_reads_ratio,
                 }
             ]
@@ -1136,18 +1061,17 @@ def main_ctrl(args, argv):
         # +++++INV+++++
         for chr in valuable_chr["INV"]:
             para = [
-
                 {
-                    "path":temporary_dir,
-                    "chr":chr,
-                    "svtype":"INV",
-                    "read_count":args.min_support,
-                    "max_cluster_bias":args.max_cluster_bias_INV,
-                    "sv_size":args.min_size,
-                    "bam_path":args.input,
-                    "action":args.genotype,
-                    "MaxSize":args.max_size,
-                    "gt_round":args.gt_round,
+                    "path": temporary_dir,
+                    "chr": chr,
+                    "svtype": "INV",
+                    "read_count": args.min_support,
+                    "max_cluster_bias": args.max_cluster_bias_INV,
+                    "sv_size": args.min_size,
+                    "bam_path": args.input,
+                    "action": args.genotype,
+                    "MaxSize": args.max_size,
+                    "gt_round": args.gt_round,
                 }
             ]
             result.append(
@@ -1158,15 +1082,15 @@ def main_ctrl(args, argv):
         for chr in valuable_chr["DUP"]:
             para = [
                 {
-                    "path":temporary_dir,
-                    "chr":chr,
-                    "read_count":args.min_support,
-                    "max_cluster_bias":args.max_cluster_bias_DUP,
-                    "sv_size":args.min_size,
-                    "bam_path":args.input,
-                    "action":args.genotype,
-                    "MaxSize":args.max_size,
-                    "gt_round":args.gt_round,
+                    "path": temporary_dir,
+                    "chr": chr,
+                    "read_count": args.min_support,
+                    "max_cluster_bias": args.max_cluster_bias_DUP,
+                    "sv_size": args.min_size,
+                    "bam_path": args.input,
+                    "action": args.genotype,
+                    "MaxSize": args.max_size,
+                    "gt_round": args.gt_round,
                 }
             ]
             result.append(
@@ -1178,15 +1102,15 @@ def main_ctrl(args, argv):
             for chr2 in valuable_chr["TRA"][chr]:
                 para = [
                     {
-                        "path":temporary_dir,
-                        "chr_1":chr,
-                        "chr_2":chr2,
-                        "read_count":args.min_support,
-                        "overlap_size":args.diff_ratio_filtering_TRA,
-                        "max_cluster_bias":args.max_cluster_bias_TRA,
-                        "bam_path":args.input,
-                        "action":args.genotype,
-                        "gt_round":args.gt_round,
+                        "path": temporary_dir,
+                        "chr_1": chr,
+                        "chr_2": chr2,
+                        "read_count": args.min_support,
+                        "overlap_size": args.diff_ratio_filtering_TRA,
+                        "max_cluster_bias": args.max_cluster_bias_TRA,
+                        "bam_path": args.input,
+                        "action": args.genotype,
+                        "gt_round": args.gt_round,
                     }
                 ]
                 result.append(
@@ -1218,7 +1142,7 @@ def main_ctrl(args, argv):
     ref_g = CacheFasta(args.reference)
     # ref_g = pyfastx.Fasta(args.reference)
 
-    if args.Ivcf != None:
+    if args.Ivcf is not None:
         result = sorted(result, key=lambda x: (x[0], x[1]))
         generate_pvcf(args, result, contigINFO, argv, ref_g)
 
@@ -1274,9 +1198,9 @@ def process_bam_file(args, temporary_dir: Path, update_temp_data: bool = True):
     Task_list = list()
     chr_name_list = list()
     contigINFO = list()
-    
+
     rgs = samfile.header["RG"]
-    assert len(rgs)==1,"Alignment file should have exactly one read group."
+    assert len(rgs) == 1, "Alignment file should have exactly one read group."
     read_group_name = rgs[0]["ID"]
 
     ref_ = samfile.get_index_statistics()
@@ -1300,12 +1224,10 @@ def process_bam_file(args, temporary_dir: Path, update_temp_data: bool = True):
     #'''
     if update_temp_data:
         process_alignments(args, temporary_dir, Task_list, bed_regions)
-    return (contigINFO,read_group_name)
+    return (contigINFO, read_group_name)
 
 
-def process_alignments(args, temporary_dir:Path, Task_list, bed_regions):
-    from pathlib import Path
-
+def process_alignments(args, temporary_dir: Path, Task_list, bed_regions):
     signatures_path = temporary_dir / "signatures/"
     signatures_path.mkdir(parents=True, exist_ok=True)
     logging.info("Signature path '%s'.", str(signatures_path))
@@ -1326,7 +1248,7 @@ def process_alignments(args, temporary_dir:Path, Task_list, bed_regions):
                 args.merge_del_threshold,
                 args.merge_ins_threshold,
                 args.max_size,
-                None if bed_regions == None else bed_regions[i],
+                None if bed_regions is None else bed_regions[i],
                 args.verbose,
             )
         ]
@@ -1335,8 +1257,8 @@ def process_alignments(args, temporary_dir:Path, Task_list, bed_regions):
     analysis_pools.join()
 
 
-def merge_signatures(args, temporary_dir:Path):
-    temporary_dir=str(temporary_dir)+"/"
+def merge_signatures(args, temporary_dir: Path):
+    temporary_dir = str(temporary_dir) + "/"
     cmd_del = (
         "cat %ssignatures/*.bed | grep -w DEL | sort -u -T %s | sort -k 2,2 -k 3,3n -T %s > %sDEL.sigs"
         % (temporary_dir, temporary_dir, temporary_dir, temporary_dir)
@@ -1369,7 +1291,9 @@ def merge_signatures(args, temporary_dir:Path):
     analysis_pools.join()
 
 
-def run(argv):
+def run(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
     args = parseArgs(argv)
     setupLogging(args.verbose)
     starttime = time.time()

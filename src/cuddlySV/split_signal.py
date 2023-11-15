@@ -1,10 +1,27 @@
 from collections import namedtuple
 from typing import List
-from .cuddlySV import acquire_clip_pos
 
 SplitRead = namedtuple(
     "SplitRead", ["read_start", "read_end", "ref_start", "ref_end", "chrom", "strand"]
 )
+
+
+def acquire_clip_pos(deal_cigar):
+    seq = list(cigar.Cigar(deal_cigar).items())
+    if seq[0][1] == "S":
+        first_pos = seq[0][0]
+    else:
+        first_pos = 0
+    if seq[-1][1] == "S":
+        last_pos = seq[-1][0]
+    else:
+        last_pos = 0
+
+    ref_span = 0
+    for i in seq:
+        if i[1] == "M" or i[1] == "D" or i[1] == "=" or i[1] == "X":
+            ref_span += i[0]
+    return [first_pos, last_pos, ref_span]
 
 
 def organize_split_signal(
@@ -277,7 +294,6 @@ def analysis_inv(
                 # 3'->3'
 
 
-
 def analysis_split_read(
     split_read: List[SplitRead],
     SV_size: int,
@@ -341,10 +357,13 @@ def analyse_ins_dup_del(
         # Same chromosome and strand
         # dup & ins & del
         if ele_1.strand == "-":
-            ele_1, ele_2 = SplitRead(
-                RLength - ele_2.read_end, RLength - ele_2.read_start, *ele_2[2:]
-            ), SplitRead(
-                RLength - ele_1.read_end, RLength - ele_1.read_start, *ele_1[2:]
+            ele_1, ele_2 = (
+                SplitRead(
+                    RLength - ele_2.read_end, RLength - ele_2.read_start, *ele_2[2:]
+                ),
+                SplitRead(
+                    RLength - ele_1.read_end, RLength - ele_1.read_start, *ele_1[2:]
+                ),
             )
             query = query[::-1]
 
@@ -444,12 +463,12 @@ def analyse_insertion_in_translocation(
                 ele_1 = SplitRead(
                     RLength - SP_list[-1].read_end,
                     RLength - SP_list[-1].read_start,
-                    *SP_list[-1][2:]
+                    *SP_list[-1][2:],
                 )
                 ele_2 = SplitRead(
                     RLength - SP_list[0].read_end,
                     RLength - SP_list[0].read_start,
-                    *SP_list[0][2:]
+                    *SP_list[0][2:],
                 )
                 query = query[::-1]
                 # print(ele_1)
@@ -469,8 +488,7 @@ def analyse_insertion_in_translocation(
                         read_name,
                         str(
                             query[
-                                ele_1.read_end
-                                + int(dis_ref / 2) : ele_2.read_start
+                                ele_1.read_end + int(dis_ref / 2) : ele_2.read_start
                                 - int(dis_ref / 2)
                             ]
                         ),
@@ -593,17 +611,17 @@ def analyse_over_three_splits(
                     ele_1 = SplitRead(
                         RLength - SP_list[sp_idx + 2].read_end,
                         RLength - SP_list[sp_idx + 2].read_start,
-                        *SP_list[sp_idx + 2][2:]
+                        *SP_list[sp_idx + 2][2:],
                     )
                     ele_2 = SplitRead(
                         RLength - SP_list[sp_idx + 1].read_end,
                         RLength - SP_list[sp_idx + 1].read_start,
-                        *SP_list[sp_idx + 1][2:]
+                        *SP_list[sp_idx + 1][2:],
                     )
                     ele_3 = SplitRead(
                         RLength - SP_list[sp_idx].read_end,
                         RLength - SP_list[sp_idx].read_start,
-                        *SP_list[sp_idx][2:]
+                        *SP_list[sp_idx][2:],
                     )
                     query = query[::-1]
 
@@ -754,19 +772,19 @@ def analyse_over_three_splits(
                 ele_1 = ele_2
                 ele_2 = ele_3
                 ele_3 = None
-            if ele_3 == None or (
+            if ele_3 is None or (
                 ele_1.strand == ele_2.strand and ele_2.strand != ele_3.strand
             ):
                 if ele_1.strand == "-":
                     ele_1 = SplitRead(
                         RLength - SP_list[sp_idx + 2].read_end,
                         RLength - SP_list[sp_idx + 2].read_start,
-                        *SP_list[sp_idx + 2][2:]
+                        *SP_list[sp_idx + 2][2:],
                     )
                     ele_2 = SplitRead(
                         RLength - SP_list[sp_idx + 1].read_end,
                         RLength - SP_list[sp_idx + 1].read_start,
-                        *SP_list[sp_idx + 1][2:]
+                        *SP_list[sp_idx + 1][2:],
                     )
                     query = query[::-1]
                 delta_length = (

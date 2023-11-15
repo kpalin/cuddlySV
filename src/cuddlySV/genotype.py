@@ -1,9 +1,11 @@
 import logging
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 from .Description import Generation_VCF_header, WorkDir
 from math import log10
 import numpy as np
 from collections import namedtuple
+
+# from .resolveDUP import DuplicationSV
 
 ChrReadInfo = namedtuple("ReadInfo", ("START", "STOP", "PRIMARY", "READ_NAME"))
 
@@ -158,8 +160,9 @@ def load_reads(temporary_dir: WorkDir, chr: str) -> List[ChrReadInfo]:
             seq = line.strip().split("\t")
             if seq[0] != chr:
                 continue
-            reads_list.append(ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4]))
-
+            reads_list.append(
+                ChrReadInfo(int(seq[1]), int(seq[2]), int(seq[3]), seq[4])
+            )
 
     return reads_list
 
@@ -285,7 +288,6 @@ def duipai(svs_list, reads_list, iteration_dict, primary_num_dict, cover2_dict):
     print("start duipai")
     idx = 0
     correct_num = 0
-    bb = set()
     for i in svs_list:
         overlap = set()
         primary_num = 0
@@ -420,7 +422,7 @@ def output_BND(args, ref_g, svid, file, action, variant):
     file.write(
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
             CHR=variant[0],
-            POS=str(int(variant[2]) +1 ),
+            POS=str(int(variant[2]) + 1),
             ID="cuddlySV.%s.%d" % ("BND", svid["BND"]),
             REF=reff,
             ALT=variant[1],
@@ -486,10 +488,7 @@ def output_INV(args, ref_g, svid, file, action, variant):
     svid[variant[1]] += 1
 
 
-from .resolveDUP import DuplicationSV
-
-
-def output_DUP(args, ref_g, svid, file, action, variant: DuplicationSV):
+def output_DUP(args, ref_g, svid, file, action, variant):
     rnames = "NULL"
     if args.report_readid:
         rnames = variant[10]
@@ -566,7 +565,7 @@ def output_INS_DEL(args, ref_g, svid, file, action, variant):
             info_list += ";AF=."
     if variant[1] == "DEL":
         info_list += ";STRAND=+-"
-    if variant[11] == "." or variant[11] == None:
+    if variant[11] == "." or variant[11] is None:
         filter_lable = "PASS"
     else:
         filter_lable = "PASS" if float(variant[11]) >= 5.0 else "q5"
@@ -623,7 +622,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             continue
         # if i[7][5] == '.,.':
         #     print(i)
-        if i[7][5] == "." or i[7][5] == None:
+        if i[7][5] == "." or i[7][5] is None:
             filter_lable = "PASS"
         else:
             filter_lable = "PASS" if float(i[7][5]) >= 2.5 else "q5"
@@ -819,11 +818,10 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
 
 
-
 def load_bed(bed_file, Task_list):
     # Task_list: [[chr, start, end], ...]
     bed_regions = dict()
-    if bed_file != None:
+    if bed_file is not None:
         # only consider regions in BED file
         with open(bed_file, "r") as f:
             for line in f:

@@ -19,7 +19,8 @@ rule somatic_filter:
 rule MQ_tags:
     input:
         cram=config["tumor_alignment"],
-        somatic_vcf="joint.{tumor}.cutesv.vcf.gz",
+        somatic_vcf="joint.{tumor}.cuddlysv.vcf.gz",
+        somatic_vcf_idx="joint.{tumor}.cuddlysv.vcf.gz.tbi",
     output:
         somatic_MQ_vcf="{tumor}.cuddlysv.somatic.vcf.gz",
         somatic_MQ_vcf_idx="{tumor}.cuddlysv.somatic.vcf.gz.tbi",
@@ -33,7 +34,7 @@ rule MQ_tags:
         "log/mq_tagging_{tumor}.log",
     shell:
         """
-        python add_mapping_tags.py --verbose -v {input.somatic_vcf} -a {input.cram} -o {output.somatic_MQ_vcf} 2>{log};
+        add_mapping_tags.py --min_support 3 --verbose -v {input.somatic_vcf} -a {input.cram} -o /dev/stdout 2>{log} |bcftools view -i 'SOMATIC=1' -o {output.somatic_MQ_vcf} ;
         tabix -p vcf {output.somatic_MQ_vcf}
         """
 
@@ -43,21 +44,23 @@ rule join_signatures:
         tumor_dir=config["tumor_work_dir"],
         normal_dir=config["normal_work_dir"],
     output:
-        workdir=directory("merged_work_{tumor}/"),
+        workdir=temp(directory("merged_work_{tumor}/")),
     resources:
         mem_mb=23000,
     benchmark:
         "log/join_signatures_{tumor}.time.txt"
     shell:
-        "bash merge_work_dirs.sh -o {output.workdir} -t {input.tumor_dir} -n {input.normal_dir}"
+        "merge_work_dirs.sh -o {output.workdir} -t {input.tumor_dir} -n {input.normal_dir}"
 
 
-rule bgzip_tabix:
+rule temp_bgzip_tabix:
     input:
         "{filename}.vcf",
     output:
-        "{filename}.vcf.gz",
-        "{filename}.vcf.gz.tbi",
+        temp("{filename}.vcf.gz"),
+        temp("{filename}.vcf.gz.tbi"),
+    wildcard_constraints:
+        filename="joint[.].*",
     shell:
         "bgzip {input};tabix -p vcf {output[0]}"
 
@@ -67,7 +70,7 @@ rule somatic:
         cram=config["tumor_alignment"],
         workdir="merged_work_{tumor}/",
     output:
-        joint_vcf=temp("joint.{tumor}.cutesv.vcf"),
+        joint_vcf=temp("joint.{tumor}.cuddlysv.vcf"),
     resources:
         mem_mb=51000,
     benchmark:
@@ -78,7 +81,7 @@ rule somatic:
     params:
         ref_fasta=config["reference_fasta"],
     shell:
-        """cuteSV {input.cram} {params.ref_fasta} {output.joint_vcf} {input.workdir}/ \
+        """cuddlySV {input.cram} {params.ref_fasta} {output.joint_vcf} {input.workdir}/ \
     --threads {threads} --report_readid --sample {wildcards.tumor} --min_support 3 --genotype \
     --max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --min_size 10 --max_cluster_bias_DEL 100 \
     --diff_ratio_merging_DEL 0.3 --retain_work_dir --verbose --max_size -1 --report_readgroup 2>{log};

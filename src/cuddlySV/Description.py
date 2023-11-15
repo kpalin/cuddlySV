@@ -2,6 +2,7 @@ import argparse
 import sys
 import logging
 from typing import Dict, Iterable, List, Tuple, Union
+from pathlib import Path
 
 if sys.version_info >= (3, 8):
     from importlib import metadata
@@ -11,32 +12,29 @@ else:
 
 VERSION = metadata.version("cuddlySV")
 
-from pathlib import Path
-
 
 class WorkDir:
-    def __init__(self,temporary_dir:str):
+    def __init__(self, temporary_dir: str):
         self.temporary_dir = Path(temporary_dir)
         if not self.temporary_dir.is_dir:
-          raise FileNotFoundError("[Errno 2] No such directory: '%s'" % temporary_dir)
-        
+            raise FileNotFoundError("[Errno 2] No such directory: '%s'" % temporary_dir)
+
     @property
     def path(self):
         return self.temporary_dir
-        
 
     @property
-    def idx(self)->Dict[str,Dict[Union[str,Tuple[str,str]],int]]:
+    def idx(self) -> Dict[str, Dict[Union[str, Tuple[str, str]], int]]:
         """Return starting file positions of chr or (chr1,chr2) in signature files. First level of
         indexing is the signature type
 
         Returns:
             Dict[svtype,Dict[Union[chrom,Tuple[chrom1,chrom2]],int]]: _description_
         """
-        if not hasattr(self,"_index"):
+        if not hasattr(self, "_index"):
             self._index = self.index_temp_files()
         return self._index
-        
+
     def temp_dir_empty(self) -> bool:
         """Check if temporary directory is finished or needs update
 
@@ -49,39 +47,39 @@ class WorkDir:
         for kind in ["DEL", "DUP", "INS", "INV", "TRA", "reads"]:
             f = self.temporary_dir / f"{kind}.sigs"
             if not f.exists():
-                f=f.parent / (f.name+".gz")
+                f = f.parent / (f.name + ".gz")
             try:
                 if f.stat().st_size == 0:
                     return True
             except FileNotFoundError:
                 return True
         return False
-    
+
     def load_valuable_chr(self) -> Dict[str, Union[List[str], Dict[str, List[str]]]]:
         """Load a dictionary of signature types to list (or dict of lists) containing the chromosome
-    names with that type of signatures.
+        names with that type of signatures.
 
-    Args:
-        path (str): The temporary work path for the signature files
+        Args:
+            path (str): The temporary work path for the signature files
 
-    Returns:
-        Dict[str,Union[List[str],Dict[str,List[str]]]]: From signature type to list of chromosome names.
+        Returns:
+            Dict[str,Union[List[str],Dict[str,List[str]]]]: From signature type to list of chromosome names.
         """
-        v={}
-        for svtype,chrd in self.idx.items():
-            svtype =svtype.split(".")[0]
-            if svtype=="TRA":
+        v = {}
+        for svtype, chrd in self.idx.items():
+            svtype = svtype.split(".")[0]
+            if svtype == "TRA":
                 v[svtype] = {}
-                for chr1,chr2 in chrd.keys():
-                    v[svtype].setdefault(chr1,list()).append(chr2)
-                for _,chrom_list in v[svtype].items():
+                for chr1, chr2 in chrd.keys():
+                    v[svtype].setdefault(chr1, list()).append(chr2)
+                for _, chrom_list in v[svtype].items():
                     chrom_list.sort()
             else:
                 v[svtype] = list(chrd.keys())
-                
+
         return v
-    
-    def lines(self,svtype:str,chrom:str,chrom2=None)->Iterable[str]:
+
+    def lines(self, svtype: str, chrom: str, chrom2=None) -> Iterable[str]:
         """Generate lines from svtype signature collection for chrom (and chrom2 for TRA )
 
         Args:
@@ -98,57 +96,56 @@ class WorkDir:
         fpath = self.path / f"{svtype}.sigs"
         with fpath.open("rt") as f:
             end_pos = sys.maxsize
-            k = chrom if chrom2 is None else (chrom,chrom2)
+            k = chrom if chrom2 is None else (chrom, chrom2)
             try:
                 pos = self.idx[fpath.name][k]
                 greater_end_pos = [x for x in self.idx[fpath.name].values() if x > pos]
-                if len(greater_end_pos)>0:
+                if len(greater_end_pos) > 0:
                     end_pos = min(greater_end_pos)
                 f.seek(pos)
-            except KeyError as e:
-                logging.warning("Couldn't find %s from %s",str(k),str(fpath))
-            
+            except KeyError:
+                logging.warning("Couldn't find %s from %s", str(k), str(fpath))
+
             line = f.readline()
-            while line!='' and f.tell()<=end_pos:
+            while line != "" and f.tell() <= end_pos:
                 yield line
                 line = f.readline()
-                
-    
+
     def index_temp_files(self):
         """Find the start positions in the sig files
 
         Raises:
             IOError: _description_
         """
-        idxs={}
+        idxs = {}
         for sigfile in self.temporary_dir.glob("*.sigs"):
-            if sigfile.name == "reads.sigs": continue
+            if sigfile.name == "reads.sigs":
+                continue
 
             idxs[sigfile.name] = {}
             prev_chrom = None
-                
-            logging.info("Starting to index %s",str(sigfile))
-            with sigfile.open("rt") as inf:                    
-                while True:                        
+
+            logging.info("Starting to index %s", str(sigfile))
+            with sigfile.open("rt") as inf:
+                while True:
                     f_line = inf.readline()
-                    if f_line=='':
+                    if f_line == "":
                         break
-                    
-                    if sigfile.name in ("INS.sigs","DUP.sigs","DEL.sigs","INV.sigs"):
-                        cur_chrom = f_line.split('\t')[1]
+
+                    if sigfile.name in ("INS.sigs", "DUP.sigs", "DEL.sigs", "INV.sigs"):
+                        cur_chrom = f_line.split("\t")[1]
                     elif sigfile.name in ("TRA.sigs"):
-                        parts = f_line.split('\t')
-                        cur_chrom = parts[1],parts[4]
-                        
-                        
+                        parts = f_line.split("\t")
+                        cur_chrom = parts[1], parts[4]
+
                     if prev_chrom != cur_chrom:
-                        c_pos = inf.tell()- len(f_line)
+                        c_pos = inf.tell() - len(f_line)
                         idxs[sigfile.name][cur_chrom] = c_pos
-                        prev_chrom = cur_chrom 
-                            
+                        prev_chrom = cur_chrom
+
         logging.info("Indexing done!")
         return idxs
-    
+
 
 class cuddlySVdp(object):
     """
@@ -187,9 +184,7 @@ class cuddlySVdp(object):
 		--diff_ratio_merging_DEL	0.3
 
 
-	""" % (
-        VERSION
-    )
+	""" % (VERSION)
 
     # MinSizeDel = 'For current version of cuteSV, it can detect deletions larger than this size.'
 

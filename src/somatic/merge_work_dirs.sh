@@ -16,7 +16,7 @@ OUTPATH="merged_work/"
 
 usage() {
     echo -e "usage:
-$0 -o OUTPATH/ -t TUMORINPATH1/ -n PONINPATH/
+$0 -o OUTPATH/ -t TUMORINPATH1/ -n PONINPATH/ [MORE_IN_PATH..]
 
 -o OUTPATH/
 -t tumor_work_dir
@@ -35,7 +35,7 @@ while getopts "o:ht:n:" flag; do
         TUMORPATH="$OPTARG"
         ;;
     n)
-        NORMALPATH="$OPTARG"
+        NORMALPATHS=("$OPTARG" "${@:$OPTIND}")
         ;;
     h | *)
         usage
@@ -55,15 +55,17 @@ trap _cleanup EXIT
 
 # Can not remove duplicate reads since we need to keep the 'normal' information
 
-sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/DEL.sigs" "${NORMALPATH}/DEL.sigs" >"${TEMPDIR}/DEL.sigs" &
+echo Will merge following paths: "${TUMORPATH}" "${NORMALPATHS[@]}"
 
-sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/INS.sigs" "${NORMALPATH}/INS.sigs" >"${TEMPDIR}/INS.sigs" &
+sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/DEL.sigs" "${NORMALPATHS[@]/%/\/DEL.sigs}" >"${TEMPDIR}/DEL.sigs" &
 
-sort -k 2,2 -k 3,3 -k 4,5n -S ${FIFTHofMEM} "${TUMORPATH}/INV.sigs" "${NORMALPATH}/INV.sigs" >"${TEMPDIR}/INV.sigs" &
+sort -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/INS.sigs" "${NORMALPATHS[@]/%/\/INS.sigs}" >"${TEMPDIR}/INS.sigs" &
 
-sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n -S ${FIFTHofMEM} "${TUMORPATH}/TRA.sigs" "${NORMALPATH}/TRA.sigs" >"${TEMPDIR}/TRA.sigs" &
+sort -k 2,2 -k 3,3 -k 4,5n -S ${FIFTHofMEM} "${TUMORPATH}/INV.sigs" "${NORMALPATHS[@]/%/\/INV.sigs}" >"${TEMPDIR}/INV.sigs" &
 
-sort -k 1,1r -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/DUP.sigs" "${NORMALPATH}/DUP.sigs" >"${TEMPDIR}/DUP.sigs" &
+sort -k 2,2 -k 5,5 -k 3,3 -k 4,4n -k 6,6n -S ${FIFTHofMEM} "${TUMORPATH}/TRA.sigs" "${NORMALPATHS[@]/%/\/TRA.sigs}" >"${TEMPDIR}/TRA.sigs" &
+
+sort -k 1,1r -k 2,2 -k 3,4n -S ${FIFTHofMEM} "${TUMORPATH}/DUP.sigs" "${NORMALPATHS[@]/%/\/DUP.sigs}" >"${TEMPDIR}/DUP.sigs" &
 
 wait
 ln -s "${TUMORPATH}/reads.sigs" "${TEMPDIR}/"

@@ -1,10 +1,9 @@
 from ast import Tuple
 from collections import namedtuple
 from typing import List
-import numpy as np
 import logging
 from .Description import WorkDir
-from .genotype import cal_CI, load_reads, overlap_cover, assign_gt
+from .genotype import load_reads, overlap_cover, assign_gt
 
 # TODO: 1. Identify DP with samfile pointer;
 # TODO: 2. Add CIPOS, CILEN and/or CIEND;
@@ -13,7 +12,7 @@ from .genotype import cal_CI, load_reads, overlap_cover, assign_gt
 
 
 def resolution_DUP(
-    path:WorkDir,
+    path: WorkDir,
     chr,
     read_count,
     max_cluster_bias,
@@ -27,9 +26,9 @@ def resolution_DUP(
     semi_dup_cluster.append([0, 0, ""])
     candidate_single_SV: List[Tuple] = list()
 
-    #file = open("%s%s.sigs" % (path, "DUP"), "r")
-    #for line in file:
-    for line in path.lines("DUP",chr):
+    # file = open("%s%s.sigs" % (path, "DUP"), "r")
+    # for line in file:
+    for line in path.lines("DUP", chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
             continue
@@ -79,7 +78,7 @@ def resolution_DUP(
                 MaxSize,
                 gt_round,
             )
-    
+
     if action:
         candidate_single_SV_gt = call_gt_dup(
             path, chr, candidate_single_SV, max_cluster_bias
@@ -184,7 +183,7 @@ def run_dup(args):
 def call_gt_dup(
     temporary_dir, chr, candidate_single_SV: List[DuplicationSV], max_cluster_bias
 ):
-    reads_list = load_reads(temporary_dir,chr)
+    reads_list = load_reads(temporary_dir, chr)
     svs_list = list()
     for item in candidate_single_SV:
         new_cluster_bias = min(max_cluster_bias, item[3] - item[2])

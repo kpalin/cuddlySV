@@ -2,8 +2,7 @@ from typing import Iterable
 from .genotype import cal_CI, overlap_cover, assign_gt
 from multiprocessing import Pool
 from pysam import VariantFile, VariantRecord
-import math
-import time
+
 import logging
 import numpy as np
 
@@ -23,7 +22,7 @@ def parse_svtype(sv_type):
 
 
 def parse_to_int(sth):
-    if sth == None:
+    if sth is None:
         return 0
     elif isinstance(sth, str):
         return int(sth)
@@ -240,7 +239,6 @@ def compare_len(len1, len2):  # len1 < len2
 def find_in_indel_list(var_type, var_list, bias_origin, pos, sv_end, threshold_gloab):
     # bias = min(bias_origin * 10, 2000)
     bias = bias_origin
-    debug_pos = -1
     if len(var_list) == 0:
         return [], 0, ".,.", ".,."
     left = 0
@@ -602,8 +600,8 @@ def solve_fc(
     gt_round,
 ):
     reads_info = dict()  # [10000, 10468, 0, 'm54238_180901_011437/52298335/ccs']
-    reads_file_name = temporary_dir.path /"reads.sigs"
-    with reads_file_name.open( "r") as readsfile:
+    reads_file_name = temporary_dir.path / "reads.sigs"
+    with reads_file_name.open("r") as readsfile:
         for line in readsfile:
             seq = line.strip().split("\t")
             chr = seq[0]
