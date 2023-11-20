@@ -64,7 +64,7 @@ def main_ctrl(args):
                     gt=call_gt(tag),
                 )
             )
-        except:
+        except Exception:
             if "TRA" in record.INFO["SVTYPE"] or "BND" in record.INFO["SVTYPE"]:
                 fileout.write(
                     "{chr}\t{pos}\t{id}\t{ref}\t{alt}\t{qual}\t{filter}\t{info}\t{format}\t{gt}\n".format(

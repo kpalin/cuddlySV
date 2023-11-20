@@ -1,7 +1,7 @@
 from collections import namedtuple
 from typing import List
 import numpy as np
-from .genotype import cal_CI, load_reads, overlap_cover, assign_gt, ChrReadInfo
+from .genotype import cal_CI, load_reads, overlap_cover, assign_gt
 from .Description import WorkDir, setupLogging
 import logging
 
@@ -11,7 +11,7 @@ import logging
 
 
 def resolution_DEL(
-    path:WorkDir,
+    path: WorkDir,
     chr,
     svtype,
     read_count,
@@ -54,9 +54,9 @@ def resolution_DEL(
     candidate_single_SV = list()
 
     logging.debug("Reading DEL signatures from files.")
-    #file = open("%s%s.sigs" % (path, "DEL"), "r")
-    #for line in file:
-    for line in path.lines("DEL",chr):
+    # file = open("%s%s.sigs" % (path, "DEL"), "r")
+    # for line in file:
+    for line in path.lines("DEL", chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
             continue
@@ -109,7 +109,7 @@ def resolution_DEL(
                 gt_round,
                 remain_reads_ratio,
             )
-    
+
     if action:
         candidate_single_SV_gt = call_gt(
             path, chr, candidate_single_SV, max_cluster_bias, "DEL"
@@ -268,7 +268,7 @@ def generate_del_cluster(
 
 
 def resolution_INS(
-    path:WorkDir,
+    path: WorkDir,
     chr,
     svtype,
     read_count,
@@ -311,12 +311,12 @@ def resolution_INS(
     semi_ins_cluster.append([0, 0, "", ""])
     candidate_single_SV = list()
 
-    #file = open("%s%s.sigs" % (path, "INS"), "r")
-    #for line in file:
-    for line in path.lines("INS",chr):
+    # file = open("%s%s.sigs" % (path, "INS"), "r")
+    # for line in file:
+    for line in path.lines("INS", chr):
         seq = line.strip("\n").split("\t")
         if seq[1] != chr:
-            logging.warning("Shouldn't have got %s",str(seq))
+            logging.warning("Shouldn't have got %s", str(seq))
             continue
 
         pos = int(seq[2])
@@ -324,7 +324,7 @@ def resolution_INS(
         read_id = seq[4]
         try:
             ins_seq = seq[5]
-        except:
+        except Exception:
             ins_seq = ""
 
         if pos - semi_ins_cluster[-1][0] > max_cluster_bias:
@@ -371,7 +371,7 @@ def resolution_INS(
                 gt_round,
                 remain_reads_ratio,
             )
-    
+
     if action:
         candidate_single_SV_gt = call_gt(
             path, chr, candidate_single_SV, 1000, "INS"

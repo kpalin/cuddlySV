@@ -409,7 +409,7 @@ def output_BND(args, ref_g, svid, file, action, variant):
             info_list += ";AF=" + str(
                 round(int(variant[5]) / (int(variant[5]) + int(variant[6])), 4)
             )
-        except:
+        except Exception:
             info_list += ";AF=."
     if variant[10] == ".":
         filter_lable = "PASS"
@@ -417,7 +417,7 @@ def output_BND(args, ref_g, svid, file, action, variant):
         filter_lable = "PASS" if float(variant[10]) >= 5.0 else "q5"
     try:
         reff = str(ref_g[variant[0]][int(variant[2])])
-    except:
+    except Exception:
         reff = "N"
     file.write(
         "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
@@ -461,7 +461,7 @@ def output_INV(args, ref_g, svid, file, action, variant):
             info_list += ";AF=" + str(
                 round(int(variant[4]) / (int(variant[4]) + int(variant[5])), 4)
             )
-        except:
+        except Exception:
             info_list += ";AF=."
     if variant[10] == ".":
         filter_lable = "PASS"
@@ -508,7 +508,7 @@ def output_DUP(args, ref_g, svid, file, action, variant):
             info_list += ";AF=" + str(
                 round(int(variant[4]) / (int(variant[4]) + int(variant[5])), 4)
             )
-        except:
+        except Exception:
             info_list += ";AF=."
     if variant[9] == ".":
         filter_lable = "PASS"
@@ -561,7 +561,7 @@ def output_INS_DEL(args, ref_g, svid, file, action, variant):
             info_list += ";AF=" + str(
                 round(int(variant[4]) / (int(variant[4]) + int(variant[7])), 4)
             )
-        except:
+        except Exception:
             info_list += ";AF=."
     if variant[1] == "DEL":
         info_list += ";STRAND=+-"
@@ -651,7 +651,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
             try:
                 info_list += ";AF=" + str(round(i[7][0] / (i[7][0] + i[7][1]), 4))
-            except:
+            except Exception:
                 info_list += ";AF=."
             file.write(
                 "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
@@ -692,7 +692,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
             try:
                 info_list += ";AF=" + str(round(i[7][0] / (i[7][0] + i[7][1]), 4))
-            except:
+            except Exception:
                 info_list += ";AF=."
             file.write(
                 "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
@@ -725,7 +725,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
             try:
                 info_list += ";AF=" + str(round(i[7][0] / (i[7][0] + i[7][1]), 4))
-            except:
+            except Exception:
                 info_list += ";AF=."
             file.write(
                 "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
@@ -760,7 +760,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
                 info_list += ";STRAND=" + i[12]
             try:
                 info_list += ";AF=" + str(round(i[7][0] / (i[7][0] + i[7][1]), 4))
-            except:
+            except Exception:
                 info_list += ";AF=."
             file.write(
                 "{CHR}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{PASS}\t{INFO}\t{FORMAT}\t{GT}:{DR}:{RE}:{PL}:{GQ}\n".format(
@@ -790,7 +790,7 @@ def generate_pvcf(args, result, contigINFO, argv, ref_g):
             )
             try:
                 info_list += ";AF=" + str(round(i[7][0] / (i[7][0] + i[7][1]), 4))
-            except:
+            except Exception:
                 info_list += ";AF=."
             """
             if ':' in i[15]:

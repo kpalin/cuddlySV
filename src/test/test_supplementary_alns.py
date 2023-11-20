@@ -1,11 +1,11 @@
 # This test code was written by the `hypothesis.extra.ghostwriter` module
 # and is provided under the Creative Commons Zero public domain dedication.
 
-from pytest import mark, skip
+from pytest import mark
 import cuteSV.cuddlySV
 import cuteSV.split_signal
-from hypothesis import assume, given, strategies as st
-from hypothesis import find, settings, Verbosity
+from hypothesis import given, strategies as st
+from hypothesis import settings, Verbosity
 
 # TODO: replace st.nothing() with appropriate strategies
 

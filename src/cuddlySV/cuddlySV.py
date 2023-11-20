@@ -3,7 +3,6 @@
 from pathlib import Path
 from typing import Any
 import pysam
-import cigar
 import pyfastx
 from .Description import WorkDir, parseArgs, setupLogging
 from multiprocessing import Pool
@@ -936,7 +935,7 @@ def single_pipe(
                 )
                 assert ele[-2] == "INV"
                 # INV chr strand pos1 pos2 read_ID
-            except:
+            except Exception:
                 assert ele[-2] == "INS"
                 file.write(
                     "%s\t%s\t%d\t%d\t%s\t%s\n"
@@ -1151,7 +1150,7 @@ def main_ctrl(args, argv):
         for res in result:
             try:
                 semi_result += res.get()[0]
-            except:
+            except Exception:
                 raise
         # sort SVs by [chr] and [pos]
         semi_result = sorted(semi_result, key=lambda x: (x[0], int(x[2])))

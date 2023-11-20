@@ -1,4 +1,3 @@
-import numpy as np
 import logging
 from .Description import WorkDir
 from .genotype import load_reads, overlap_cover, assign_gt

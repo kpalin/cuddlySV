@@ -52,7 +52,7 @@ def parse_record(record):
         end = parse_to_int(record.info["END"])
     try:
         end = parse_to_int(record.stop)
-    except:
+    except Exception:
         pass
     if sv_type == "INS" or sv_type == "DEL":
         end = svlen
@@ -82,7 +82,7 @@ def parse_record(record):
             if ":" in tra_alt:
                 chrom2 = tra_alt.split(":")[0]
                 end = int(tra_alt.split(":")[1])
-        except:
+        except Exception:
             pass
     else:
         chrom2 = record.chrom

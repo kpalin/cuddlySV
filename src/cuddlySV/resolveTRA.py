@@ -1,4 +1,3 @@
-import numpy as np
 import logging
 from .Description import WorkDir
 from .genotype import cal_GL, threshold_ref_count, count_coverage
@@ -170,7 +169,6 @@ def generate_semi_tra_cluster(
                 return
 
             if action:
-                import time
 
                 # time_start = time.time()
                 DV, DR, GT, GL, GQ, QUAL = call_gt(
@@ -209,7 +207,6 @@ def generate_semi_tra_cluster(
             )
 
             if action:
-                import time
 
                 # time_start = time.time()
                 DV, DR, GT, GL, GQ, QUAL = call_gt(
@@ -263,7 +260,6 @@ def generate_semi_tra_cluster(
                 return
 
             if action:
-                import time
 
                 # time_start = time.time()
                 DV, DR, GT, GL, GQ, QUAL = call_gt(

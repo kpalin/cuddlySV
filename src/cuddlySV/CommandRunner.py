@@ -1,6 +1,11 @@
 from string import Template
 import tempfile
-import subprocess, signal, logging, os, stat, sys
+import subprocess
+import signal
+import logging
+import os
+import stat
+import sys
 
 
 class Alarm(Exception):
@@ -101,7 +106,7 @@ class CommandRunner:
         if wDir is None:
             wDir = "./"
 
-        if type(cmds) != list:
+        if not isinstance(cmds, list):
             cmd = self.buildCommand(cmds)
             return exe(cmd)
 
@@ -137,19 +142,6 @@ class CommandRunner:
             outputRet.append(exe(cmd))
 
         return outputRet
-
-    def checkTemplate(self):
-        """
-        Checks that my template works okay
-        """
-        temp.update(
-            {"CMD": "test", "STDOUT": "testo", "STDERR": "teste", "JOBNAME": "testn"}
-        )
-        try:
-            w = self.template.substitute(temp)
-        except KeyError:
-            logging.error("Your submission template is invalid ")
-            sys.exit(1)
 
     def buildCommand(self, cmdSetup):
         """

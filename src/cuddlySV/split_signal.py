@@ -74,7 +74,7 @@ def organize_split_signal(
                             local_strand,
                         )
                     )
-                except:
+                except Exception:
                     pass
     if len(split_read) <= max_split_parts or max_split_parts == -1:
         analysis_split_read(

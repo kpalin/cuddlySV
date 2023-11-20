@@ -342,9 +342,6 @@ def get_read_group(input_bam: str) -> str:
     return rg_name
 
 
-import pysam
-
-
 class BamMapqFetcher:
     "Enable querying of mapping qualitites of reads on given region of a bam/cram file"
 
