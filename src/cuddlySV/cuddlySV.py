@@ -715,8 +715,6 @@ def parse_read(
     Combine_sig_in_same_read_del = list()
     from pysam import CSOFT_CLIP, CHARD_CLIP, CMATCH, CINS, CDEL, CEQUAL, CDIFF
 
-    if aligned.query_name == "6cc3cf72-3142-4584-a60b-27a425e39665":
-        logging.info("Using read %s", aligned.query_name)
     if aligned.mapq >= min_mapq:
         pos_start = aligned.reference_start  # 0-based
         pos_end = aligned.reference_end
@@ -910,7 +908,7 @@ def single_pipe(
         logging.info("Skip %s:%d-%d." % (Chr_name, task[1], task[2]))
         return
 
-    output = temp_dir / "signatures/_%s_%d_%d.bed" % (Chr_name, task[1], task[2])
+    output = temp_dir / ("signatures/_%s_%d_%d.bed" % (Chr_name, task[1], task[2]))
     file = open(output, "w")
     for ele in candidate:
         if len(ele) == 5:
@@ -943,9 +941,8 @@ def single_pipe(
                 )
                 # INS chr pos len read_ID seq
     file.close()
-    reads_output = (
-        temp_dir
-        / "signatures/_%s_%d_%d.reads"
+    reads_output = temp_dir / (
+        "signatures/_%s_%d_%d.reads"
         % (
             Chr_name,
             task[1],
@@ -966,9 +963,9 @@ def multi_run_wrapper(args):
     setupLogging(True)
     try:
         return single_pipe(*args)
-    except Exception:
+    except Exception as exc:
         logging.exception("Exception while handing alignments!")
-        raise
+        raise exc
 
 
 def error_handler(exc):
@@ -1150,8 +1147,8 @@ def main_ctrl(args, argv):
         for res in result:
             try:
                 semi_result += res.get()[0]
-            except Exception:
-                raise
+            except Exception as exc:
+                raise exc
         # sort SVs by [chr] and [pos]
         semi_result = sorted(semi_result, key=lambda x: (x[0], int(x[2])))
 

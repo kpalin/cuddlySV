@@ -50,32 +50,29 @@ def organize_split_signal(
         local_mapq = int(seq[4])
         if local_mapq >= min_mapq:
             # if local_mapq >= 0:
-            local_set = acquire_clip_pos(local_cigar)
+            first_pos, last_pos, ref_span = acquire_clip_pos(local_cigar)
             if local_strand == "+":
                 split_read.append(
                     SplitRead(
-                        local_set[0],
-                        total_L - local_set[1],
+                        first_pos,
+                        total_L - last_pos,
                         local_start,
-                        local_start + local_set[2],
+                        local_start + ref_span - 1,
                         local_chr,
                         local_strand,
                     )
                 )
             else:
-                try:
-                    split_read.append(
-                        SplitRead(
-                            local_set[1],
-                            total_L - local_set[0],
-                            local_start,
-                            local_start + local_set[2],
-                            local_chr,
-                            local_strand,
-                        )
+                split_read.append(
+                    SplitRead(
+                        last_pos,
+                        total_L - first_pos,
+                        local_start,
+                        local_start + ref_span - 1,
+                        local_chr,
+                        local_strand,
                     )
-                except Exception:
-                    pass
+                )
     if len(split_read) <= max_split_parts or max_split_parts == -1:
         analysis_split_read(
             split_read, SV_size, total_L, read_name, candidate, MaxSize, query

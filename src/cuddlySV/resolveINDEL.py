@@ -521,16 +521,18 @@ def run_del(args):
     setupLogging()
     try:
         return resolution_DEL(**args)
-    except Exception:
+    except Exception as exc:
         logging.exception("Error clustering DEL: %s", str(args))
+        raise exc
 
 
 def run_ins(args):
     setupLogging()
     try:
         return resolution_INS(**args)
-    except Exception:
+    except Exception as exc:
         logging.exception("Error clustering INS: %s", str(args))
+        raise exc
 
 
 def call_gt(temporary_dir, chr, candidate_single_SV, max_cluster_bias, svtype):
