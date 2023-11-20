@@ -1,5 +1,6 @@
 from collections import namedtuple
 from typing import List
+import cigar
 
 SplitRead = namedtuple(
     "SplitRead", ["read_start", "read_end", "ref_start", "ref_end", "chrom", "strand"]
