@@ -968,14 +968,6 @@ def multi_run_wrapper(args):
         raise exc
 
 
-def error_handler(exc):
-    import traceback
-
-    traceback.print_exception(exc)
-    logging.exception("Exception while multiprocessing!")
-    raise exc
-
-
 def main_ctrl(args, argv):
     if not os.path.isfile(args.reference):
         raise FileNotFoundError("[Errno 2] No such file: '%s'" % args.reference)
@@ -1014,6 +1006,11 @@ def main_ctrl(args, argv):
         logging.info("Clustering structural variants.")
         analysis_pools = Pool(processes=int(args.threads))
 
+        def error_handler(exc, pool=analysis_pools):
+            logging.exception("Exception while multiprocessing! Exiting..")
+            pool.terminate()
+            raise exc
+
         # +++++DEL+++++
         for chr in valuable_chr["DEL"]:
             para = [
@@ -1031,7 +1028,9 @@ def main_ctrl(args, argv):
                     "remain_reads_ratio": args.remain_reads_ratio,
                 }
             ]
-            result.append(analysis_pools.map_async(run_del, para))
+            result.append(
+                analysis_pools.map_async(run_del, para, error_callback=error_handler)
+            )
 
         # +++++INS+++++
         for chr in valuable_chr["INS"]:
@@ -1229,6 +1228,11 @@ def process_alignments(args, temporary_dir: Path, Task_list, bed_regions):
     logging.info("Signature path '%s'.", str(signatures_path))
 
     analysis_pools = Pool(processes=int(args.threads))
+
+    def error_handler(exc, pool=analysis_pools):
+        logging.exception("Exception while multiprocessing! Exiting..")
+        pool.terminate()
+        raise exc
 
     for i in range(len(Task_list)):
         para = [
