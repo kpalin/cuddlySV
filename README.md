@@ -11,7 +11,7 @@ Long-read sequencing enables the comprehensive discovery of structural variation
 ### Installation
 
 ```console
-git clone --branch somatic https://github.com/kpalin/cuddlySV.git && cd cuddlySV/ && pip install .
+pip install git+http://github.com/kpalin/cuddlySV.git@v3.0.0
 ```
 
 Note the '.' at the end.
