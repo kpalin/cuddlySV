@@ -505,7 +505,9 @@ def add_mq_chunk(
         mapping_qualities = list(mapping_qualities.values())
 
         if len(mapping_qualities) == 0:
-            logging.warning("No supporting reads found for %s", str(record))
+            logging.warning(
+                "No supporting reads found for %s. Why am I even here?!", str(record)
+            )
             continue
         # Calculate Mean Mapping Quality (MQ) for each read
         mean_mapping_quality = sum(mapping_qualities) / len(mapping_qualities)
